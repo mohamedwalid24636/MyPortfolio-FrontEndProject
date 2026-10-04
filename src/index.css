@@ -1,0 +1,333 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Design tokens
+   ============================================================ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Sora", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Deep, cool near-black surfaces */
+  --color-ink-950: #05070d;
+  --color-ink-900: #080b14;
+  --color-ink-850: #0b1020;
+  --color-ink-800: #0f1525;
+  --color-ink-700: #161d31;
+  --color-ink-600: #202a45;
+  --color-ink-500: #2b3757;
+
+  /* Primary accent — indigo */
+  --color-accent-200: #c7d2fe;
+  --color-accent-300: #a5b4fc;
+  --color-accent-400: #818cf8;
+  --color-accent-500: #6366f1;
+  --color-accent-600: #4f46e5;
+  --color-accent-700: #4338ca;
+
+  /* Foreground scale */
+  --color-fg: #eef1f8;
+  --color-fg-muted: #a7b0c0;
+  --color-fg-subtle: #6f7a8e;
+
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+
+  --animate-float: float 7s ease-in-out infinite;
+  --animate-marquee: marquee 34s linear infinite;
+  --animate-shimmer: shimmer 2.2s linear infinite;
+  --animate-pulse-slow: pulse-slow 4.5s ease-in-out infinite;
+  --animate-spin-slow: spin 14s linear infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-14px);
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: -200% 0;
+    }
+    to {
+      background-position: 200% 0;
+    }
+  }
+  @keyframes pulse-slow {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-ink-950 text-fg font-sans antialiased;
+    background-image:
+      radial-gradient(60rem 40rem at 12% -10%, rgba(99, 102, 241, 0.13), transparent 60%),
+      radial-gradient(48rem 32rem at 92% 4%, rgba(34, 211, 238, 0.09), transparent 60%),
+      radial-gradient(52rem 40rem at 50% 118%, rgba(168, 85, 247, 0.1), transparent 55%);
+    background-attachment: fixed;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight text-fg;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: rgba(99, 102, 241, 0.38);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent-400);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2b3757 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #202a45;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #2b3757;
+    background-clip: content-box;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* ============================================================
+   Custom utilities
+   Declared with @utility so they compose via @apply like built-ins.
+   ============================================================ */
+@utility container-page {
+  @apply mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8;
+}
+
+@utility section {
+  @apply py-20 sm:py-24 lg:py-28;
+}
+
+@utility eyebrow {
+  @apply inline-flex items-center gap-2 font-mono text-xs font-medium uppercase tracking-[0.22em] text-accent-300;
+}
+
+@utility heading-gradient {
+  background: linear-gradient(100deg, #eef1f8 0%, #a5b4fc 45%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-muted {
+  @apply text-fg-muted;
+}
+
+/* Surfaces */
+@utility surface {
+  @apply rounded-2xl border border-white/8 bg-ink-850/70 backdrop-blur-xl;
+}
+
+@utility card {
+  @apply surface relative overflow-hidden transition duration-300;
+}
+
+@utility card-hover {
+  @apply hover:-translate-y-1 hover:border-accent-500/40 hover:shadow-[0_24px_60px_-28px_rgba(99,102,241,0.55)];
+}
+
+/* Buttons */
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition duration-200 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@utility btn-primary {
+  @apply btn text-white;
+  background-image: linear-gradient(110deg, #4f46e5, #6366f1 45%, #22d3ee 120%);
+  box-shadow: 0 10px 30px -12px rgba(99, 102, 241, 0.75);
+
+  &:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+}
+
+@utility btn-outline {
+  @apply btn border border-white/12 bg-white/[0.03] text-fg hover:border-accent-400/50 hover:bg-white/[0.06];
+}
+
+@utility btn-ghost {
+  @apply btn text-fg-muted hover:bg-white/[0.05] hover:text-fg;
+}
+
+@utility btn-danger {
+  @apply btn text-white disabled:cursor-not-allowed disabled:opacity-60;
+  background-image: linear-gradient(110deg, #be123c, #e11d48 55%, #f43f5e 120%);
+  box-shadow: 0 10px 30px -14px rgba(225, 29, 72, 0.8);
+
+  &:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+}
+
+/* Destructive icon-only action inside admin tables */
+@utility btn-icon {
+  @apply inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-fg-muted transition hover:border-accent-500/40 hover:text-accent-200 disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+@utility btn-icon-danger {
+  @apply inline-flex size-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-fg-muted transition hover:border-rose-400/50 hover:bg-rose-500/10 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+/* Field with a rejected value */
+@utility field-invalid {
+  @apply border-rose-400/60 bg-rose-500/[0.06] focus:border-rose-400;
+}
+
+/* Chips / badges */
+@utility chip {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-fg-muted;
+}
+
+@utility chip-accent {
+  @apply inline-flex items-center gap-1.5 rounded-full border border-accent-500/30 bg-accent-500/12 px-3 py-1 text-xs font-medium text-accent-200;
+}
+
+/* Forms */
+@utility field-label {
+  @apply mb-1.5 block text-sm font-medium text-fg-muted;
+}
+
+@utility field {
+  @apply w-full rounded-xl border border-white/10 bg-ink-900/80 px-4 py-3 text-sm text-fg placeholder:text-fg-subtle transition focus:border-accent-500/60 focus:bg-ink-900 focus:outline-none;
+}
+
+@utility link {
+  @apply text-accent-300 underline decoration-accent-500/40 decoration-1 underline-offset-4 transition hover:text-accent-200 hover:decoration-accent-300;
+}
+
+/* Loading skeleton */
+@utility skeleton {
+  @apply rounded-lg bg-ink-700/60;
+  background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2.2s linear infinite;
+}
+
+@utility divider {
+  @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
+}
+
+@utility glow-ring {
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.25),
+    0 24px 70px -30px rgba(99, 102, 241, 0.7);
+}
+
+@utility mask-fade-x {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+@utility text-shadow-hero {
+  text-shadow: 0 2px 40px rgba(99, 102, 241, 0.35);
+}
+
+/* ============================================================
+   Rich text (blog content)
+   ============================================================ */
+@layer components {
+  .prose-content {
+    @apply text-[1.0625rem] leading-8 text-fg-muted;
+  }
+  .prose-content h2 {
+    @apply mt-10 mb-3 text-2xl font-semibold text-fg;
+  }
+  .prose-content h3 {
+    @apply mt-8 mb-2 text-xl font-semibold text-fg;
+  }
+  .prose-content p {
+    @apply my-4;
+  }
+  .prose-content ul {
+    @apply my-4 list-disc space-y-2 pl-6;
+  }
+  .prose-content ol {
+    @apply my-4 list-decimal space-y-2 pl-6;
+  }
+  .prose-content a {
+    @apply link;
+  }
+  .prose-content code {
+    @apply rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[0.9em] text-accent-200;
+  }
+  .prose-content pre {
+    @apply my-6 overflow-x-auto rounded-xl border border-white/10 bg-ink-900 p-4 font-mono text-sm;
+  }
+  .prose-content pre code {
+    @apply bg-transparent p-0 text-fg;
+  }
+  .prose-content blockquote {
+    @apply my-6 border-l-2 border-accent-500/50 bg-white/[0.03] py-2 pl-4 italic;
+  }
+  .prose-content img {
+    @apply my-6 rounded-xl;
+  }
+}
