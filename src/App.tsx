@@ -104,7 +104,9 @@ const router = createBrowserRouter([
       { path: ":resourceKey", element: <AdminResourcePage /> },
     ],
   },
-]);
+  // `basename` is the path the site is served from. Without it every route 404s on a GitHub Pages
+  // project site, where the app lives under /<repo>/ rather than at the domain root.
+], { basename: import.meta.env.BASE_URL });
 
 export function App() {
   return (

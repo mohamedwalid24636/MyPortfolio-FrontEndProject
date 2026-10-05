@@ -42,7 +42,9 @@ export function createReadService<TDto>(resource: string): ReadService<TDto> {
         signal,
       );
 
-      if (firstPage.totalPages <= 1) return firstPage.data;
+      // `data` is nullable in the backend contract, so an empty page arrives as null rather than [].
+      const firstBatch = firstPage?.data ?? [];
+      if ((firstPage?.totalPages ?? 0) <= 1) return firstBatch;
 
       const remainingPages = await Promise.all(
         Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
@@ -53,7 +55,7 @@ export function createReadService<TDto>(resource: string): ReadService<TDto> {
         ),
       );
 
-      return [firstPage, ...remainingPages].flatMap((page) => page.data);
+      return [firstPage, ...remainingPages].flatMap((page) => page?.data ?? []);
     },
     getById: (id, signal) => apiClient.get<TDto>(`/${resource}/${id}`, signal),
   };

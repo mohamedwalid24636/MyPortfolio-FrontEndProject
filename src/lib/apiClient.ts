@@ -5,12 +5,28 @@ import { clearSession, getSession } from "@/lib/tokenStore";
 /**
  * The single place the backend is addressed.
  *
- * `VITE_API_BASE_URL` is the only knob; no component builds a URL by hand. It defaults to "/api",
- * which the Vite dev/preview proxy forwards to the ASP.NET Core API, so development needs no CORS
- * and no self-signed-certificate handling in the browser.
+ * `VITE_API_BASE_URL` is the only knob; no component builds a URL by hand. It must be an absolute
+ * origin in production — the Vite dev proxy only exists while `npm run dev` is running, so a
+ * relative "/api" would resolve against the GitHub Pages origin and 404.
  */
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const BASE_URL = RAW_BASE.replace(/\/+$/, "");
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL?.trim() || "https://mohamedwalid.runasp.net/api";
+
+/**
+ * Normalised to an absolute origin plus the `/api` root, with no trailing slash, so `${BASE}${path}`
+ * can never produce a doubled or missing separator.
+ */
+const BASE_URL = (() => {
+  const trimmed = RAW_BASE.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(trimmed)) return trimmed;
+
+  try {
+    const url = new URL(trimmed);
+    url.pathname = url.pathname.replace(/\/+$/, "") || "/api";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed;
+  }
+})();
 
 /** Field name (camelCase) -> messages, produced from ASP.NET's ValidationProblemDetails. */
 export type FieldErrors = Record<string, string[]>;

@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import fs from "node:fs";
 import path from "node:path";
 
 export default defineConfig(({ mode }) => {
@@ -8,8 +9,13 @@ export default defineConfig(({ mode }) => {
 
   // Single place the backend origin is configured. Everything the browser needs (API calls and
   // attachment files) is forwarded here, so development never depends on CORS.
-  // Point VITE_API_PROXY_TARGET at the URL the API is actually listening on.
-  const apiTarget = env.VITE_API_PROXY_TARGET || "https://localhost:7067";
+  const apiTarget = env.VITE_API_PROXY_TARGET || "http://localhost:5022";
+
+  // GitHub Pages serves a project site from https://<user>.github.io/<repo>/, so every emitted URL
+  // has to be prefixed with that subpath. A user/organisation site (or local dev) uses "/".
+  const base = env.VITE_BASE_PATH
+    ? `/${env.VITE_BASE_PATH.replace(/^\/+|\/+$/g, "")}/`
+    : "/";
 
   const proxy = {
     changeOrigin: true,
@@ -17,8 +23,26 @@ export default defineConfig(({ mode }) => {
     secure: false,
   };
 
+  // Files in public/ are copied byte-for-byte and never see transformIndexHtml, so the base path is
+  // stamped into the SPA fallback after the copy step instead.
+  const basePathIn404Plugin = {
+    name: "stamp-base-path-into-404",
+    apply: "build" as const,
+    closeBundle() {
+      const target = path.resolve(import.meta.dirname, "dist", "404.html");
+      if (!fs.existsSync(target)) {
+        throw new Error("dist/404.html is missing; deep links would 404 on GitHub Pages.");
+      }
+      const html = fs.readFileSync(target, "utf8");
+      if (!html.includes("__BASE__")) return;
+      fs.writeFileSync(target, html.replaceAll("__BASE__", base));
+    },
+  };
+
   return {
-    plugins: [react(), tailwindcss()],
+    // Must precede the plugins so the HTML transform already sees the base path.
+    base,
+    plugins: [basePathIn404Plugin, react(), tailwindcss()],
     resolve: {
       alias: {
         "@": path.resolve(import.meta.dirname, "./src"),

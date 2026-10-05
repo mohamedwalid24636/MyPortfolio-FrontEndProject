@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      /*
+        GitHub Pages serves this file for any path it cannot map to a real file, which is exactly
+        what a refresh on a client-side route (/projects, /admin/skills, ...) looks like to it. The
+        SPA has to boot before it can decide what that path means, so the requested path is stashed
+        in sessionStorage and the real entry point is loaded; main.tsx reads the value back and
+        rewrites the address bar.
+
+        __BASE__ is replaced with the Vite base path at build time, because a relative path cannot
+        be resolved safely here — the browser would resolve it against the 404 URL, not the site
+        root.
+      */
+      (function () {
+        var base = "__BASE__";
+
+        try {
+          var path = window.location.pathname;
+          if (path.indexOf(base) === 0) path = path.slice(base.length) || "/";
+          sessionStorage.setItem(
+            "gh-pages-path",
+            path + window.location.search + window.location.hash,
+          );
+        } catch (e) {
+          // Blocked storage must not stop the redirect below.
+        }
+
+        window.location.replace(base + "index.html");
+      })();
+    </script>
+    <title>Portfolio</title>
+  </head>
+  <body>
+    <p>Loading…</p>
+  </body>
+</html>

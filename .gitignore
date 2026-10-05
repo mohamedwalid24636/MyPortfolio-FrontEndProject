@@ -5,6 +5,9 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# .env.production holds only public, already-deployed values (the API origin, the Pages path) and
+# must be committed: Vite inlines VITE_* at build time, so CI has no other way to know them.
+!.env.production
 .vite
 *.log
 .DS_Store
