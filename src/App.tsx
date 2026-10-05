@@ -1,3 +1,7 @@
+// Must stay the first import: it rewrites the address bar from GitHub Pages' 404 fallback, and the
+// router below reads `window.location` at module scope — after this module body has run.
+import "@/restoreGitHubPagesPath";
+
 import { lazy, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, RouterProvider, useLocation, useParams } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
