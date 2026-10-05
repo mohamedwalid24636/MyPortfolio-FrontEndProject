@@ -15,6 +15,16 @@ interface HeroSectionProps {
   stats: HeroStat[];
 }
 
+/**
+ * Copy for the "Focus" overlay that sits over the portrait.
+ *
+ * Deliberately hardcoded. This was previously the first three skills joined with a separator, but
+ * the skills endpoint orders alphabetically, so it always surfaced whichever skill names happened to
+ * sort first ("2D Tilemaps & Physics", "Animator & Audio", "ASP.NET Core Identity") rather than
+ * anything chosen. Change this value to change the overlay.
+ */
+const HERO_FOCUS = "Junior .Net Developer";
+
 const container = {
   hidden: {},
   show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
@@ -133,9 +143,7 @@ export function HeroSection({ stats }: HeroSectionProps) {
 
               <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/10 bg-ink-950/70 p-4 backdrop-blur-md">
                 <p className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-accent-300">Focus</p>
-                <p className="mt-1 text-sm leading-relaxed text-fg">
-                  {data.skills.slice(0, 3).map((skill) => skill.name).join(" · ") || "Skills managed in the admin panel"}
-                </p>
+                <p className="mt-1 text-sm leading-relaxed text-fg">{HERO_FOCUS}</p>
               </div>
             </div>
 
