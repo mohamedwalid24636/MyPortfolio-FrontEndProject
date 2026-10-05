@@ -82,3 +82,21 @@ export function resolveFileUrl(url: string | null | undefined, fallback: string)
 export function hasLink(url: string | null | undefined): url is string {
   return typeof url === "string" && url.trim().length > 0;
 }
+
+/** Video extensions the attachment service accepts and the browser can play without a transcode. */
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".ogv", ".mov"];
+
+/**
+ * True when the URL points at a video rather than a still image.
+ *
+ * A project gallery stores screenshots and screen recordings in the same record, so the renderer
+ * has to branch on the extension: an `<img>` cannot decode an `.mp4`. The failure would also be
+ * silent, because `SmartImage` swaps in a placeholder on load errors — the gallery would just show
+ * a placeholder tile instead of the walkthrough. Query strings and fragments are ignored so a
+ * cache-busted `?v=2` URL still matches.
+ */
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (typeof url !== "string" || url.trim().length === 0) return false;
+  const path = url.trim().split(/[?#]/)[0].toLowerCase();
+  return VIDEO_EXTENSIONS.some((extension) => path.endsWith(extension));
+}

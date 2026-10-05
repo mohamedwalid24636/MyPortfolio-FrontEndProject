@@ -15,6 +15,7 @@ import { NotFoundBlock } from "@/components/ui/NotFoundBlock";
 import { Reveal } from "@/components/ui/Reveal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { SmartImage } from "@/components/ui/SmartImage";
+import { SmartMedia } from "@/components/ui/SmartMedia";
 import { useProject } from "@/hooks/usePortfolioData";
 import { usePageMeta } from "@/hooks/usePageMeta";
 import { useSiteData } from "@/context/SiteDataContext";
@@ -158,9 +159,9 @@ export default function ProjectDetailPage() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 {images.map((image) => (
                   <figure key={image.id} className="card overflow-hidden">
-                    <SmartImage
+                    <SmartMedia
                       src={image.imageUrl}
-                      alt={image.caption || `${project.title} screenshot`}
+                      alt={image.caption || `${project.title} media`}
                       className="aspect-[16/10] w-full object-cover"
                     />
                     {image.caption ? (

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { FileText, ImageIcon, Loader2, RefreshCw, Trash2, Upload, X } from "lucide-react";
-import { SmartImage } from "@/components/ui/SmartImage";
+import { SmartMedia } from "@/components/ui/SmartMedia";
 import { slugify } from "@/lib/format";
 import { hasLink } from "@/lib/media";
 
@@ -484,7 +484,7 @@ export function FileField({
 
         {hasStored && kind === "image" ? (
           <div className="mt-3 border-t border-white/8 pt-3">
-            <SmartImage src={currentUrl} alt="Currently stored file" className="h-24 w-full rounded-lg object-contain" />
+            <SmartMedia src={currentUrl} alt="Currently stored file" className="h-24 w-full rounded-lg object-contain" />
           </div>
         ) : null}
 

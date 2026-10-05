@@ -4,7 +4,7 @@ import { FormSection, FileField, type FileFieldValue } from "@/components/admin/
 import { useToast } from "@/components/admin/ToastProvider";
 import { projectImageService } from "@/services";
 import { isAbortError } from "@/lib/apiClient";
-import { resolveImageUrl } from "@/lib/media";
+import { SmartMedia } from "@/components/ui/SmartMedia";
 import type { ProjectDto, ProjectImageDto } from "@/types/api";
 
 interface ProjectManagementExperienceProps {
@@ -23,6 +23,13 @@ const emptyDraft = (): ImageDraft => ({
   displayOrder: "",
   file: { file: null, removeExisting: false },
 });
+
+/**
+ * Gallery entries are screenshots or screen recordings, so the picker has to offer both. The API
+ * enforces the real ceiling per extension (200 MB for `.mp4`, 10 MB otherwise) and rejects anything
+ * else with a message naming the limit.
+ */
+const GALLERY_ACCEPT = ".jpg,.jpeg,.png,.webp,.gif,.svg,.mp4,.webm,.ogv,.mov";
 
 /** Project-only relations editor. The project must exist before gallery records can be persisted. */
 export function ProjectManagementExperience({ project, onChanged }: ProjectManagementExperienceProps) {
@@ -50,7 +57,7 @@ export function ProjectManagementExperience({ project, onChanged }: ProjectManag
   const saveImage = async () => {
     if (!project) return;
     if (!editingId && !draft.file.file) {
-      toast.error("Image required", "Choose an image before adding it to the gallery.");
+      toast.error("Media required", "Choose a screenshot or video before adding it to the gallery.");
       return;
     }
 
@@ -113,8 +120,8 @@ export function ProjectManagementExperience({ project, onChanged }: ProjectManag
   return (
     <div className="space-y-5 border-t border-white/8 pt-6">
       <FormSection
-        title="Project images"
-        description={project ? "Upload, preview, reorder with display order, replace, or remove gallery images." : "Save the project first, then add its gallery images here."}
+        title="Project gallery"
+        description={project ? "Upload, preview, reorder with display order, replace, or remove gallery screenshots and videos." : "Save the project first, then add its gallery media here."}
       >
         {project ? (
           <>
@@ -125,10 +132,10 @@ export function ProjectManagementExperience({ project, onChanged }: ProjectManag
                 .map((image) => (
                   <article key={image.id} className="group overflow-hidden rounded-xl border border-white/10 bg-ink-900/60">
                     <div className="aspect-[4/3] overflow-hidden bg-ink-850">
-                      <img src={resolveImageUrl(image.imageUrl)} alt={image.caption || "Project gallery"} className="size-full object-cover transition duration-300 group-hover:scale-105" />
+                      <SmartMedia src={image.imageUrl} alt={image.caption || "Project gallery"} className="size-full object-cover transition duration-300 group-hover:scale-105" />
                     </div>
                     <div className="space-y-2 p-3">
-                      <p className="truncate text-xs font-medium text-fg">{image.caption || "Untitled image"}</p>
+                      <p className="truncate text-xs font-medium text-fg">{image.caption || "Untitled item"}</p>
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[0.7rem] text-fg-subtle">Order {image.displayOrder || "—"}</span>
                         <div className="flex gap-1">
@@ -148,8 +155,8 @@ export function ProjectManagementExperience({ project, onChanged }: ProjectManag
             <div className="mt-5 rounded-xl border border-white/8 bg-ink-900/40 p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-fg">{editingId ? "Edit gallery image" : "Add gallery image"}</p>
-                  <p className="mt-1 text-xs text-fg-subtle">The image is previewed locally before the multipart request is sent.</p>
+                  <p className="text-sm font-semibold text-fg">{editingId ? "Edit gallery media" : "Add gallery media"}</p>
+                  <p className="mt-1 text-xs text-fg-subtle">The file is previewed locally before the multipart request is sent.</p>
                 </div>
                 {editingId ? <button type="button" className="btn-ghost !px-2" onClick={resetDraft}><X aria-hidden="true" className="size-4" /> Cancel</button> : null}
               </div>
@@ -164,11 +171,19 @@ export function ProjectManagementExperience({ project, onChanged }: ProjectManag
                 </label>
               </div>
               <div className="mt-4">
-                <FileField name="project-gallery-image" label={editingId ? "Replace image" : "Image"} value={draft.file} currentUrl={editingId ? images.find((image) => image.id === editingId)?.imageUrl : undefined} onChange={(file) => setDraft((current) => ({ ...current, file }))} />
+                <FileField
+                  name="project-gallery-image"
+                  label={editingId ? "Replace media" : "Media"}
+                  hint="Screenshot or screen recording. Video is capped at 200 MB by the API."
+                  accept={GALLERY_ACCEPT}
+                  value={draft.file}
+                  currentUrl={editingId ? images.find((image) => image.id === editingId)?.imageUrl : undefined}
+                  onChange={(file) => setDraft((current) => ({ ...current, file }))}
+                />
               </div>
               <button type="button" className="btn-primary mt-4" onClick={saveImage} disabled={isSaving}>
                 {isSaving ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : editingId ? <Save aria-hidden="true" className="size-4" /> : <ImagePlus aria-hidden="true" className="size-4" />}
-                {isSaving ? "Saving…" : editingId ? "Save image" : "Add image"}
+                {isSaving ? "Saving…" : editingId ? "Save media" : "Add media"}
               </button>
             </div>
           </>
