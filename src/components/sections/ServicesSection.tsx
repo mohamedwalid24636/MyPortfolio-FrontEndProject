@@ -18,7 +18,7 @@ function ServiceCard({ service, index }: { service: ServiceDto; index: number })
 
   return (
     <Reveal delay={index * 0.07} className="h-full">
-      <article className="card card-hover group flex h-full flex-col p-6">
+      <article className="card card-hover group flex h-full flex-col p-5 sm:p-6">
         <div className="flex items-start justify-between">
           <span className="flex size-12 items-center justify-center rounded-2xl border border-accent-500/25 bg-accent-500/10 text-accent-200 transition duration-300 group-hover:scale-105 group-hover:border-accent-500/50 group-hover:bg-accent-500/20">
             {hasLink(service.iconUrl) ? (
@@ -46,7 +46,7 @@ export function ServicesSection() {
   const services = [...data.services].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
   return (
-    <section id="services" className="section scroll-mt-24">
+    <section id="services" className="section scroll-mt-24 border-t border-white/[0.06]">
       <div className="container-page">
         <SectionHeading
           eyebrow="What I do"
@@ -54,7 +54,7 @@ export function ServicesSection() {
           description="Everything below is grounded in hands-on project work — from schema design to the last API endpoint."
         />
 
-        <div className="mt-12">
+        <div className="mt-8 sm:mt-10">
           <DataSection
             items={services}
             isLoading={isLoading}
@@ -80,7 +80,7 @@ export function ServicesSection() {
             }
           >
             {(items) => (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 {items.map((service, index) => (
                   <ServiceCard key={service.id} service={service} index={index} />
                 ))}

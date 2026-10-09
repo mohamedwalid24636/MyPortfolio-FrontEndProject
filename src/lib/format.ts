@@ -79,6 +79,30 @@ export function toBulletList(description: string | null | undefined): string[] {
     .filter((line) => line.length > 2);
 }
 
-export function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+/**
+ * Turns a long backend text blob into readable paragraphs.
+ *
+ * Explicit blank lines win when the author used them. Otherwise sentences are grouped, so a
+ * description does not degrade into one visual line per sentence.
+ */
+export function toParagraphs(text: string | null | undefined, sentencesPerParagraph = 3): string[] {
+  const trimmed = text?.trim();
+  if (!trimmed) return [];
+
+  const explicit = trimmed
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  if (explicit.length > 1) return explicit;
+
+  const sentences = (trimmed.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [trimmed])
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  const paragraphs: string[] = [];
+  for (let index = 0; index < sentences.length; index += sentencesPerParagraph) {
+    paragraphs.push(sentences.slice(index, index + sentencesPerParagraph).join(" "));
+  }
+
+  return paragraphs.length > 0 ? paragraphs : [trimmed];
 }

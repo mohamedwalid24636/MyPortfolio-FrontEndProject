@@ -54,7 +54,7 @@ export function useBlogPost(slug: string | null) {
 
     try {
       const posts = await blogPostService.findPublished(signal);
-      const match = posts.find((post) => post.slug === slug);
+      const match = posts.find((post) => post.slug === slug || String(post.id) === slug);
       if (match) return match;
 
       if (/^\d+$/.test(slug)) {

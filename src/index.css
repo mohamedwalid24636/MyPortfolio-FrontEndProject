@@ -28,49 +28,29 @@
   /* Foreground scale */
   --color-fg: #eef1f8;
   --color-fg-muted: #a7b0c0;
-  --color-fg-subtle: #6f7a8e;
+  --color-fg-subtle: #77839a;
 
   --radius-4xl: 2rem;
   --radius-5xl: 2.5rem;
 
-  --animate-float: float 7s ease-in-out infinite;
-  --animate-marquee: marquee 34s linear infinite;
-  --animate-shimmer: shimmer 2.2s linear infinite;
-  --animate-pulse-slow: pulse-slow 4.5s ease-in-out infinite;
-  --animate-spin-slow: spin 14s linear infinite;
+  /* Elevation — restrained, no coloured glow. A hairline inset highlight gives each surface a
+     subtle top edge so cards read as raised rather than painted on. */
+  --shadow-surface: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(2, 4, 10, 0.4);
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(2, 4, 10, 0.35),
+    0 18px 40px -28px rgba(2, 4, 10, 0.9);
+  --shadow-lift:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 4px rgba(2, 4, 10, 0.4),
+    0 28px 56px -30px rgba(2, 4, 10, 0.95);
 
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-14px);
-    }
-  }
-  @keyframes marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
-  }
+  --animate-shimmer: shimmer 2.2s linear infinite;
+
   @keyframes shimmer {
     from {
       background-position: -200% 0;
     }
     to {
       background-position: 200% 0;
-    }
-  }
-  @keyframes pulse-slow {
-    0%,
-    100% {
-      opacity: 0.35;
-    }
-    50% {
-      opacity: 0.7;
     }
   }
 }
@@ -87,11 +67,15 @@
 
   body {
     @apply bg-ink-950 text-fg font-sans antialiased;
+    /* A layered, low-contrast wash so the page reads as deep navy rather than flat black:
+       a faint indigo aura behind the top, a cooler blue hint on the right, sitting over a
+       vertical tonal gradient. No fixed attachment (cheaper to paint while scrolling) and no
+       saturated glow. */
+    background-color: var(--color-ink-950);
     background-image:
-      radial-gradient(60rem 40rem at 12% -10%, rgba(99, 102, 241, 0.13), transparent 60%),
-      radial-gradient(48rem 32rem at 92% 4%, rgba(34, 211, 238, 0.09), transparent 60%),
-      radial-gradient(52rem 40rem at 50% 118%, rgba(168, 85, 247, 0.1), transparent 55%);
-    background-attachment: fixed;
+      radial-gradient(60rem 30rem at 50% -14%, rgba(99, 102, 241, 0.12), transparent 62%),
+      radial-gradient(46rem 24rem at 88% 6%, rgba(56, 89, 189, 0.1), transparent 60%),
+      linear-gradient(180deg, #0a0f1f 0%, #060a17 46%, #05070d 100%);
     min-height: 100dvh;
     text-rendering: optimizeLegibility;
   }
@@ -153,15 +137,20 @@
 }
 
 /* ============================================================
-   Custom utilities
-   Declared with @utility so they compose via @apply like built-ins.
+   Layout primitives
    ============================================================ */
 @utility container-page {
-  @apply mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-8;
+  @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
 }
 
+/** Reading-width container for long-form text. */
+@utility container-narrow {
+  @apply mx-auto w-full max-w-3xl px-4 sm:px-6;
+}
+
+/** Vertical rhythm between homepage sections. */
 @utility section {
-  @apply py-20 sm:py-24 lg:py-28;
+  @apply py-12 sm:py-16 lg:py-24;
 }
 
 @utility eyebrow {
@@ -169,7 +158,7 @@
 }
 
 @utility heading-gradient {
-  background: linear-gradient(100deg, #eef1f8 0%, #a5b4fc 45%, #67e8f9 100%);
+  background: linear-gradient(100deg, #eef1f8 0%, #c7d2fe 55%, #a5b4fc 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -179,9 +168,11 @@
   @apply text-fg-muted;
 }
 
-/* Surfaces */
+/* ============================================================
+   Surfaces & cards
+   ============================================================ */
 @utility surface {
-  @apply rounded-2xl border border-white/8 bg-ink-850/70 backdrop-blur-xl;
+  @apply rounded-2xl border border-white/8 bg-ink-850/70 shadow-surface backdrop-blur-xl;
 }
 
 @utility card {
@@ -189,42 +180,30 @@
 }
 
 @utility card-hover {
-  @apply hover:-translate-y-1 hover:border-accent-500/40 hover:shadow-[0_24px_60px_-28px_rgba(99,102,241,0.55)];
+  @apply hover:-translate-y-0.5 hover:border-white/15 hover:shadow-lift;
 }
 
-/* Buttons */
+/* ============================================================
+   Buttons
+   ============================================================ */
 @utility btn {
   @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition duration-200 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 @utility btn-primary {
-  @apply btn text-white;
-  background-image: linear-gradient(110deg, #4f46e5, #6366f1 45%, #22d3ee 120%);
-  box-shadow: 0 10px 30px -12px rgba(99, 102, 241, 0.75);
-
-  &:hover {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
-  }
+  @apply btn bg-accent-600 text-white shadow-surface hover:bg-accent-500 hover:shadow-card active:translate-y-px;
 }
 
 @utility btn-outline {
-  @apply btn border border-white/12 bg-white/[0.03] text-fg hover:border-accent-400/50 hover:bg-white/[0.06];
+  @apply btn border border-white/12 bg-white/[0.03] text-fg hover:border-accent-400/60 hover:bg-white/[0.06];
 }
 
 @utility btn-ghost {
-  @apply btn text-fg-muted hover:bg-white/[0.05] hover:text-fg;
+  @apply btn text-fg-muted hover:bg-white/[0.06] hover:text-fg;
 }
 
 @utility btn-danger {
-  @apply btn text-white disabled:cursor-not-allowed disabled:opacity-60;
-  background-image: linear-gradient(110deg, #be123c, #e11d48 55%, #f43f5e 120%);
-  box-shadow: 0 10px 30px -14px rgba(225, 29, 72, 0.8);
-
-  &:hover {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
-  }
+  @apply btn bg-rose-600 text-white shadow-surface hover:bg-rose-500 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60;
 }
 
 /* Destructive icon-only action inside admin tables */
@@ -241,7 +220,9 @@
   @apply border-rose-400/60 bg-rose-500/[0.06] focus:border-rose-400;
 }
 
-/* Chips / badges */
+/* ============================================================
+   Chips / badges
+   ============================================================ */
 @utility chip {
   @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-fg-muted;
 }
@@ -250,7 +231,9 @@
   @apply inline-flex items-center gap-1.5 rounded-full border border-accent-500/30 bg-accent-500/12 px-3 py-1 text-xs font-medium text-accent-200;
 }
 
-/* Forms */
+/* ============================================================
+   Forms
+   ============================================================ */
 @utility field-label {
   @apply mb-1.5 block text-sm font-medium text-fg-muted;
 }
@@ -263,7 +246,9 @@
   @apply text-accent-300 underline decoration-accent-500/40 decoration-1 underline-offset-4 transition hover:text-accent-200 hover:decoration-accent-300;
 }
 
-/* Loading skeleton */
+/* ============================================================
+   Feedback
+   ============================================================ */
 @utility skeleton {
   @apply rounded-lg bg-ink-700/60;
   background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
@@ -272,22 +257,7 @@
 }
 
 @utility divider {
-  @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
-}
-
-@utility glow-ring {
-  box-shadow:
-    0 0 0 1px rgba(99, 102, 241, 0.25),
-    0 24px 70px -30px rgba(99, 102, 241, 0.7);
-}
-
-@utility mask-fade-x {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-}
-
-@utility text-shadow-hero {
-  text-shadow: 0 2px 40px rgba(99, 102, 241, 0.35);
+  @apply h-px w-full bg-white/10;
 }
 
 /* ============================================================

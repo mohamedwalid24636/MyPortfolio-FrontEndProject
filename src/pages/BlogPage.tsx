@@ -24,17 +24,13 @@ function BlogCard({ post, index }: { post: BlogPostDto; index: number }) {
       <article className="card card-hover group h-full">
         <div className="flex flex-col sm:flex-row">
           {hasLink(post.coverImageUrl) ? (
-            <Link
-              to={href}
-              className="relative block aspect-[16/10] w-full shrink-0 overflow-hidden sm:aspect-auto sm:w-56"
-              aria-label={`Read ${post.title}`}
-            >
+            <div className="relative block aspect-[16/10] w-full shrink-0 overflow-hidden sm:aspect-auto sm:w-56">
               <SmartImage
                 src={post.coverImageUrl}
                 alt={post.title}
                 className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
-            </Link>
+            </div>
           ) : null}
 
           <div className="flex flex-1 flex-col p-6">
@@ -53,20 +49,19 @@ function BlogCard({ post, index }: { post: BlogPostDto; index: number }) {
             </div>
 
             <h2 className="mt-3 font-display text-lg leading-snug font-semibold text-fg transition-colors group-hover:text-accent-200">
-              <Link to={href}>{post.title}</Link>
+              <Link to={href} className="after:absolute after:inset-0">
+                {post.title}
+              </Link>
             </h2>
 
             <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-fg-muted">
               {post.shortDescription || "No summary provided for this article."}
             </p>
 
-            <Link
-              to={href}
-              className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-accent-300 transition hover:gap-2.5 hover:text-accent-200"
-            >
+            <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-semibold text-accent-300 transition group-hover:gap-2.5 group-hover:text-accent-200">
               Read article
               <ArrowUpRight aria-hidden="true" className="size-4" />
-            </Link>
+            </span>
           </div>
         </div>
       </article>

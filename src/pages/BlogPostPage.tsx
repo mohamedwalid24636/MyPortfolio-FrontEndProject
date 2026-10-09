@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarDays, Clock, Newspaper, Share2 } from "lucide-react";
+import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+import { CalendarDays, Clock, Newspaper, Share2 } from "lucide-react";
 import { Chip } from "@/components/ui/Chip";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { NotFoundBlock } from "@/components/ui/NotFoundBlock";
@@ -61,15 +62,9 @@ export default function BlogPostPage() {
   return (
     <article className="pt-32 sm:pt-36">
       <div className="container-page">
-        <Link
-          to="/blog"
-          className="inline-flex items-center gap-2 text-sm font-medium text-fg-muted transition hover:gap-3 hover:text-accent-200"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          All articles
-        </Link>
+        <Breadcrumbs items={[{ label: "Blog", to: "/blog" }, { label: post.title }]} />
 
-        <Reveal className="mt-7 max-w-3xl">
+        <Reveal className="mt-6 max-w-3xl">
           <div className="flex flex-wrap items-center gap-2">
             {post.status ? <Chip variant="accent">{post.status}</Chip> : null}
             {published ? (

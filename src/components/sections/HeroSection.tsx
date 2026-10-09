@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Download, MapPin } from "lucide-react";
+import { ArrowRight, Download, Mail, MapPin } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SocialLinks } from "@/components/ui/SocialLinks";
 import { SmartImage } from "@/components/ui/SmartImage";
+import { ScrollRow } from "@/components/ui/ScrollRow";
 import { useSiteData } from "@/context/SiteDataContext";
 import type { SocialLinkDto } from "@/types/api";
 
@@ -13,35 +14,33 @@ export interface HeroStat {
 
 interface HeroSectionProps {
   stats: HeroStat[];
+  /** Most-used technologies across the portfolio, most frequent first. */
+  stack: string[];
 }
 
 /**
- * Copy for the "Focus" overlay that sits over the portrait.
- *
- * Deliberately hardcoded. This was previously the first three skills joined with a separator, but
- * the skills endpoint orders alphabetically, so it always surfaced whichever skill names happened to
- * sort first ("2D Tilemaps & Physics", "Animator & Audio", "ASP.NET Core Identity") rather than
- * anything chosen. Change this value to change the overlay.
+ * Positioning copy for the hero. Deliberately hardcoded — it is branding, not data.
+ * Everything the visitor can verify (title, bio, location, links) still comes from the API.
  */
-const HERO_FOCUS = "Junior .Net Developer";
+const HERO_SPECIALISM =
+  "I build backend systems with ASP.NET Core — REST APIs, relational data and code other developers can maintain.";
 
 const container = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 22 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] as const } },
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const } },
 };
 
-export function HeroSection({ stats }: HeroSectionProps) {
+export function HeroSection({ stats, stack }: HeroSectionProps) {
   const { data } = useSiteData();
   const profile = data.profile;
 
   const name = profile?.fullName?.trim() || "Portfolio";
-  const role = profile?.professionalTitle?.trim() || "Portfolio";
-  const summary = profile?.bio?.trim() || "";
+  const role = profile?.professionalTitle?.trim() || "";
   const location = profile?.location?.trim() || "";
   const portrait = profile?.profileImageUrl;
   const socialLinks: SocialLinkDto[] = data.socialLinks;
@@ -49,106 +48,128 @@ export function HeroSection({ stats }: HeroSectionProps) {
   const resumeHref = data.activeResume?.fileUrl ? `${data.activeResume.fileUrl}#view=FitH` : "/resume";
 
   return (
-    <section className="relative overflow-hidden pt-32 pb-20 sm:pt-36 lg:pt-40 lg:pb-28">
-      {/* Decorative grid */}
+    <section className="relative overflow-hidden pt-24 pb-12 sm:pt-28 sm:pb-14 lg:pt-32 lg:pb-20">
+      {/* Decorative grid — a quiet backdrop, not a focal point. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.35] [mask-image:radial-gradient(70%_60%_at_50%_35%,#000,transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 opacity-30 [mask-image:radial-gradient(70%_60%_at_50%_35%,#000,transparent)]"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(148,163,184,0.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.09) 1px, transparent 1px)",
-          backgroundSize: "58px 58px",
+            "linear-gradient(to right, rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.08) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
         }}
       />
 
       <div className="container-page">
-        <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
+        <div className="grid items-center gap-8 sm:gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
           <motion.div variants={container} initial="hidden" animate="show">
-            <motion.p variants={item} className="mt-7 font-mono text-sm text-fg-subtle">
-              <span className="text-accent-300">const</span> developer = &#123;
-            </motion.p>
+            {role ? (
+              <motion.p variants={item}>
+                <span className="eyebrow">{role}</span>
+              </motion.p>
+            ) : null}
 
             <motion.h1
               variants={item}
-              className="mt-2 font-display text-4xl leading-[1.08] font-extrabold sm:text-5xl lg:text-6xl"
+              className="mt-4 font-display text-[2rem] leading-[1.08] font-bold sm:text-5xl lg:text-6xl"
             >
               <span className="heading-gradient">{name}</span>
             </motion.h1>
 
-            <motion.p
-              variants={item}
-              className="mt-4 font-display text-lg font-semibold text-fg sm:text-xl lg:text-2xl"
-            >
-              {role}
-            </motion.p>
-
             <motion.p variants={item} className="mt-5 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
-              {summary}
+              {HERO_SPECIALISM}
             </motion.p>
 
-            <motion.p variants={item} className="mt-5 flex items-center gap-2 text-sm text-fg-subtle">
-              <MapPin aria-hidden="true" className="size-4 text-accent-400" />
-              {location}
-            </motion.p>
+            {location ? (
+              <motion.p variants={item} className="mt-4 flex items-center gap-2 text-sm text-fg-subtle">
+                <MapPin aria-hidden="true" className="size-4 text-accent-400" />
+                {location}
+              </motion.p>
+            ) : null}
 
-            <motion.div variants={item} className="mt-9 flex flex-wrap items-center gap-3">
+            <motion.div variants={item} className="mt-8 flex flex-wrap items-center gap-3">
               <Link to="/projects" className="btn-primary">
-                View my work
+                View projects
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
-              <a href={resumeHref} target="_blank" rel="noreferrer noopener" className="btn-outline">
-                <Download aria-hidden="true" className="size-4" />
-                Download CV
+              <a
+                href={resumeHref}
+                target={data.activeResume ? "_blank" : undefined}
+                rel={data.activeResume ? "noreferrer noopener" : undefined}
+                className="btn-outline"
+              >
+                {data.activeResume ? (
+                  <Download aria-hidden="true" className="size-4" />
+                ) : (
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                )}
+                {data.activeResume ? "Download CV" : "View resume"}
               </a>
+              <Link to="/contact" className="btn-ghost">
+                <Mail aria-hidden="true" className="size-4" />
+                Contact me
+              </Link>
             </motion.div>
 
-            <motion.div variants={item} className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-5">
-              {stats.map((stat) => (
-                <div key={stat.label}>
-                  <p className="font-display text-2xl font-bold text-fg sm:text-3xl">{stat.value}</p>
-                  <p className="mt-0.5 text-xs uppercase tracking-[0.16em] text-fg-subtle">{stat.label}</p>
-                </div>
-              ))}
-            </motion.div>
-
-            <motion.div variants={item} className="mt-9">
+            <motion.div variants={item} className="mt-8">
               <SocialLinks links={socialLinks} />
             </motion.div>
-
-            <motion.p variants={item} className="mt-9 font-mono text-xs text-fg-subtle">
-              &#125; <span className="text-accent-300">//</span> building reliable systems, one API at a time.
-            </motion.p>
           </motion.div>
 
           {/* Portrait */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.94 }}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
-            className="relative mx-auto w-full max-w-md lg:max-w-none"
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+            className="relative mx-auto w-full max-w-sm lg:max-w-sm"
           >
-            <div
-              aria-hidden="true"
-              className="absolute -inset-6 rounded-[2.5rem] bg-gradient-to-br from-accent-600/25 via-fuchsia-500/10 to-cyan-400/25 blur-2xl"
-            />
-
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-ink-850 shadow-2xl">
+            <div className="relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-ink-850 shadow-lift">
               <SmartImage
                 src={portrait}
                 alt={`${name}, ${role}`}
                 eager
                 className="aspect-[4/5] w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-transparent to-transparent" />
-
-              <div className="absolute inset-x-4 bottom-4 rounded-2xl border border-white/10 bg-ink-950/70 p-4 backdrop-blur-md">
-                <p className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-accent-300">Focus</p>
-                <p className="mt-1 text-sm leading-relaxed text-fg">{HERO_FOCUS}</p>
+              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/70 via-transparent to-transparent" />
+              <div className="absolute inset-x-4 bottom-4 flex items-center gap-2.5 rounded-xl border border-white/10 bg-ink-950/75 px-3.5 py-2.5 backdrop-blur-md">
+                <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-emerald-400" />
+                <span className="text-xs font-medium text-fg">Open to opportunities</span>
               </div>
             </div>
-
           </motion.div>
         </div>
+
+        {/* At-a-glance strip: numbers a recruiter can read in one pass. */}
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="mt-10 border-t border-white/10 pt-7 sm:mt-12 sm:pt-8"
+        >
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-14">
+            <motion.ul variants={item} className="flex flex-wrap gap-x-10 gap-y-5">
+              {stats.map((stat) => (
+                <li key={stat.label}>
+                  <p className="font-display text-2xl font-bold text-fg sm:text-3xl">{stat.value}</p>
+                  <p className="mt-0.5 text-xs uppercase tracking-[0.16em] text-fg-subtle">{stat.label}</p>
+                </li>
+              ))}
+            </motion.ul>
+
+            {stack.length > 0 ? (
+              <motion.div variants={item} className="max-w-xl lg:text-right">
+                <p className="eyebrow">Core stack</p>
+                <ScrollRow as="ul" fadeFrom="from-ink-950" className="mt-3 lg:justify-end">
+                  {stack.map((technology) => (
+                    <li key={technology} className="chip">
+                      {technology}
+                    </li>
+                  ))}
+                </ScrollRow>
+              </motion.div>
+            ) : null}
+          </div>
+        </motion.div>
       </div>
     </section>
   );

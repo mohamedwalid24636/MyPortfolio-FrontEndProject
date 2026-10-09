@@ -9,7 +9,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "seed:dry": "node scripts/seed.mjs --dry-run",
+    "seed:reset": "node scripts/seed.mjs --reset",
+    "verify:content": "node scripts/verify-content.mjs",
+    "verify:api": "node scripts/verify-api.mjs"
   },
   "dependencies": {
     "framer-motion": "^13.4.6",

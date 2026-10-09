@@ -17,7 +17,7 @@ interface FeaturedProjectsSectionProps {
 
 export function FeaturedProjectsSection({ projects, isLoading, error, onRetry }: FeaturedProjectsSectionProps) {
   return (
-    <section id="projects" className="section scroll-mt-24">
+    <section id="projects" className="section scroll-mt-24 border-t border-white/[0.06]">
       <div className="container-page">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <SectionHeading
@@ -33,7 +33,7 @@ export function FeaturedProjectsSection({ projects, isLoading, error, onRetry }:
           </Reveal>
         </div>
 
-        <div className="mt-12">
+        <div className="mt-8 sm:mt-10">
           <DataSection
             items={projects}
             isLoading={isLoading}

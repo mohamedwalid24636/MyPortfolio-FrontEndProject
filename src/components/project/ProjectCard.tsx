@@ -1,44 +1,42 @@
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 import { GithubIcon } from "@/components/ui/BrandIcons";
 import { Chip } from "@/components/ui/Chip";
 import { SmartImage } from "@/components/ui/SmartImage";
 import { hasLink } from "@/lib/media";
 import type { ProjectDto } from "@/types/api";
 
-const MAX_VISIBLE_TAGS = 4;
+const MAX_VISIBLE_TAGS = 3;
 
 interface ProjectCardProps {
   project: ProjectDto;
-  /** Adds a subtle 3D tilt on pointer movement (desktop only). */
-  tilt?: boolean;
 }
 
-export function ProjectCard({ project, tilt = true }: ProjectCardProps) {
+/**
+ * Scannable summary of a project. Everything a visitor needs to decide whether to open it
+ * (name, one-line pitch, category, stack, status) — the full case study lives on the detail page.
+ *
+ * The title is a stretched link, so the whole card is one tab stop instead of three.
+ */
+export function ProjectCard({ project }: ProjectCardProps) {
   const technologies = project.technologies ?? [];
   const categories = project.categories ?? [];
   const visibleTechnologies = technologies.slice(0, MAX_VISIBLE_TAGS);
   const remaining = technologies.length - visibleTechnologies.length;
+  const year = project.startDate ? new Date(project.startDate).getFullYear() : null;
 
   return (
-    <article
-      className="card card-hover group flex h-full flex-col"
-      style={tilt ? { transform: "translateZ(0)" } : undefined}
-    >
-      <Link
-        to={`/projects/${project.id}`}
-        className="relative block aspect-[16/10] overflow-hidden"
-        aria-label={`View details for ${project.title}`}
-      >
+    <article className="card card-hover group flex h-full flex-row sm:flex-col">
+      <div className="relative w-24 shrink-0 overflow-hidden border-r border-white/8 bg-ink-800 sm:aspect-[16/10] sm:w-full sm:border-r-0 sm:border-b">
         <SmartImage
           src={project.imageUrl}
-          alt={`${project.title} preview`}
+          alt=""
           eager={false}
-          className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.07]"
+          className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/25 to-transparent" />
+        <div className="absolute inset-0 hidden bg-gradient-to-t from-ink-950/75 via-ink-950/10 to-transparent sm:block" />
 
-        <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-2 p-4">
+        <div className="absolute inset-x-4 top-4 hidden flex-wrap items-center gap-2 sm:flex">
           {project.status ? <Chip variant="accent">{project.status}</Chip> : null}
           {project.featured ? (
             <Chip>
@@ -47,49 +45,60 @@ export function ProjectCard({ project, tilt = true }: ProjectCardProps) {
             </Chip>
           ) : null}
         </div>
+      </div>
 
-        <span className="absolute right-4 top-4 flex size-9 translate-y-2 items-center justify-center rounded-xl border border-white/15 bg-ink-950/80 text-fg opacity-0 backdrop-blur transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <ArrowUpRight aria-hidden="true" className="size-4" />
-        </span>
-      </Link>
-
-      <div className="flex flex-1 flex-col gap-3.5 p-5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-subtle">
-          {categories.length > 0 ? (
-            <span className="font-mono uppercase tracking-wider">{categories[0].name}</span>
-          ) : null}
-          {project.startDate ? (
-            <span>{new Date(project.startDate).getFullYear()}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 sm:gap-3 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[0.7rem] uppercase tracking-wider text-fg-subtle">
+            {categories.length > 0 ? <span>{categories[0].name}</span> : null}
+            {year ? <span>{year}</span> : null}
+          </div>
+          {project.status ? (
+            <Chip variant="accent" className="sm:hidden">
+              {project.status}
+            </Chip>
           ) : null}
         </div>
 
-        <h3 className="font-display text-lg leading-snug font-semibold text-fg transition-colors group-hover:text-accent-200">
-          <Link to={`/projects/${project.id}`}>{project.title}</Link>
+        <h3 className="font-display text-base leading-snug font-semibold text-fg sm:text-lg">
+          <Link
+            to={`/projects/${project.id}`}
+            className="transition after:absolute after:inset-0 group-hover:text-accent-200"
+          >
+            {project.title}
+          </Link>
         </h3>
 
-        <p className="line-clamp-3 text-sm leading-relaxed text-fg-muted">
+        <p className="line-clamp-2 text-sm leading-relaxed text-fg-muted sm:line-clamp-3">
           {project.shortDescription || project.description}
         </p>
 
-        {visibleTechnologies.length > 0 ? (
-          <ul className="mt-1 flex flex-wrap gap-1.5">
+        {technologies.length > 0 ? (
+          <ul className="mt-0.5 flex flex-wrap gap-1.5">
             {visibleTechnologies.map((technology) => (
-              <li key={technology.id}>
-                <Chip>{technology.name}</Chip>
+              <li key={technology.id} className="min-w-0 max-w-full">
+                <Chip className="max-w-full overflow-hidden">
+                  <span className="min-w-0 truncate">{technology.name}</span>
+                </Chip>
               </li>
             ))}
-            {remaining > 0 ? <li className="text-xs leading-6 text-fg-subtle">+{remaining}</li> : null}
+            {remaining > 0 ? (
+              <li
+                className="flex items-center text-xs leading-6 text-fg-subtle"
+                title={`${remaining} more ${remaining === 1 ? "technology" : "technologies"}`}
+              >
+                <span aria-hidden="true">+{remaining}</span>
+                <span className="sr-only"> {remaining} more technologies</span>
+              </li>
+            ) : null}
           </ul>
         ) : null}
 
-        <div className="mt-auto flex items-center gap-2 pt-2">
-          <Link
-            to={`/projects/${project.id}`}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-300 transition hover:gap-2.5 hover:text-accent-200"
-          >
-            View project
-            <ArrowUpRight aria-hidden="true" className="size-4" />
-          </Link>
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/8 pt-3 sm:pt-3.5">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent-300 transition group-hover:text-accent-200">
+            View details
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </span>
 
           {hasLink(project.githubUrl) ? (
             <a
@@ -97,7 +106,7 @@ export function ProjectCard({ project, tilt = true }: ProjectCardProps) {
               target="_blank"
               rel="noreferrer noopener"
               aria-label={`${project.title} source code on GitHub`}
-              className="ml-auto flex size-9 items-center justify-center rounded-lg border border-white/10 text-fg-muted transition hover:border-accent-500/40 hover:text-accent-200"
+              className="relative z-10 flex size-9 items-center justify-center rounded-lg border border-white/10 text-fg-muted transition hover:border-accent-500/40 hover:text-accent-200"
             >
               <GithubIcon className="size-4" />
             </a>
@@ -115,7 +124,7 @@ interface ProjectGridProps {
 
 export function ProjectGrid({ projects, className = "" }: ProjectGridProps) {
   return (
-    <div className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${className}`}>
+    <div className={`grid gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 ${className}`}>
       {projects.map((project) => (
         <ProjectCard key={project.id} project={project} />
       ))}

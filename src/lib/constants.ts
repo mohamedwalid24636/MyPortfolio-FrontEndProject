@@ -22,21 +22,37 @@ export interface NavItem {
   to: string;
 }
 
+/**
+ * Top-level routes. Deliberately short: everything a visitor needs is either one of these
+ * pages or a section of the home page, so the header never turns into a sitemap.
+ */
 export const NAV_ITEMS: NavItem[] = [
   { label: "Home", to: "/" },
   { label: "Projects", to: "/projects" },
+  { label: "Blog", to: "/blog" },
   { label: "Resume", to: "/resume" },
   { label: "Contact", to: "/contact" },
 ];
 
-export const HOME_SECTIONS = [
-  { id: "about", label: "About" },
-  { id: "services", label: "Services" },
-  { id: "skills", label: "Skills" },
-  { id: "projects", label: "Projects" },
-  { id: "experience", label: "Experience" },
-  { id: "achievements", label: "Achievements" },
-] as const;
+export interface HomeSectionLink {
+  label: string;
+  hash: string;
+}
+
+/**
+ * Deep links into the home page, used by the footer so sections stay discoverable.
+ *
+ * `#experience` is listed here but only rendered by the footer when the API holds an experience
+ * record — the section hides itself when there is nothing to show (see `ExperienceSection`).
+ */
+export const HOME_SECTION_LINKS: HomeSectionLink[] = [
+  { label: "About", hash: "#about" },
+  { label: "Projects", hash: "#projects" },
+  { label: "Experience", hash: "#experience" },
+  { label: "Education", hash: "#education" },
+  { label: "Certifications", hash: "#certifications" },
+  { label: "Services", hash: "#services" },
+];
 
 /** Max page size accepted by the backend (clamped server-side to 1..100). */
 export const MAX_PAGE_SIZE = 100;

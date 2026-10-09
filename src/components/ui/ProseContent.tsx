@@ -118,6 +118,14 @@ export function ProseContent({ content }: ProseContentProps) {
     flushList();
   };
 
+  // Normalize heading levels against the shallowest heading the author actually used, so the first
+  // body heading always maps to `h2` (the article's own title owns the page's only `h1`). Without
+  // this, an article written with `##` would emit `h3` first and skip a level.
+  const headingLevels = lines
+    .map((rawLine) => /^(#{1,4})\s+\S/.exec(rawLine.trim())?.[1].length)
+    .filter((value): value is number => typeof value === "number");
+  const minHeadingLevel = headingLevels.length > 0 ? Math.min(...headingLevels) : 2;
+
   for (const rawLine of lines) {
     const line = rawLine.trim();
 
@@ -152,9 +160,13 @@ export function ProseContent({ content }: ProseContentProps) {
       const level = headingMatch[1].length;
       const content2 = headingMatch[2];
       const sizes = ["text-2xl", "text-xl", "text-lg", "text-base"];
-      const Heading = `h${Math.min(level + 1, 6)}` as "h2" | "h3" | "h4" | "h5" | "h6";
+      const outputLevel = Math.min(Math.max(level - minHeadingLevel + 2, 2), 6);
+      const Heading = `h${outputLevel}` as "h2" | "h3" | "h4" | "h5" | "h6";
       blocks.push(
-        <Heading key={`h-${blockIndex++}`} className={`${sizes[level - 1]} font-semibold text-fg mt-8 mb-2`}>
+        <Heading
+          key={`h-${blockIndex++}`}
+          className={`${sizes[Math.min(outputLevel - 2, sizes.length - 1)]} font-semibold text-fg mt-8 mb-2`}
+        >
           {renderInline(content2, `h${blockIndex}`)}
         </Heading>,
       );

@@ -12,10 +12,11 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.VITE_API_PROXY_TARGET || "http://localhost:5022";
 
   // GitHub Pages serves a project site from https://<user>.github.io/<repo>/, so every emitted URL
-  // has to be prefixed with that subpath. A user/organisation site (or local dev) uses "/".
-  const base = env.VITE_BASE_PATH
-    ? `/${env.VITE_BASE_PATH.replace(/^\/+|\/+$/g, "")}/`
-    : "/";
+  // has to be prefixed with that subpath. A user/organisation site (or local dev) uses "/", which is
+  // also how a bare `VITE_BASE_PATH=/` is written — normalize first so the value can never collapse
+  // into an invalid "//" base.
+  const basePath = (env.VITE_BASE_PATH ?? "").replace(/^\/+|\/+$/g, "");
+  const base = basePath ? `/${basePath}/` : "/";
 
   const proxy = {
     changeOrigin: true,

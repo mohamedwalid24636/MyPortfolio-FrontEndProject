@@ -104,9 +104,9 @@ export default function ContactPage() {
         description="Questions about a role, a project or an architecture? Send a message and I will reply as soon as I can."
       />
 
-      <section className="section pt-14">
-        <div className="container-page grid gap-10 lg:grid-cols-[1.25fr_0.75fr] lg:gap-14">
-          <Reveal className="card p-6 sm:p-8">
+      <section className="section pt-10 sm:pt-14">
+        <div className="container-page grid gap-8 sm:gap-10 lg:grid-cols-[1.25fr_0.75fr] lg:gap-14">
+          <Reveal className="card min-w-0 p-5 sm:p-8">
             <h2 className="font-display text-xl font-bold">Send a message</h2>
             <p className="mt-2 text-sm text-fg-muted">
               All fields are required. Your message is stored securely and never shared.
@@ -242,8 +242,8 @@ export default function ContactPage() {
             </form>
           </Reveal>
 
-          <div className="space-y-6">
-            <Reveal delay={0.06} className="card p-6">
+          <div className="min-w-0 space-y-6">
+            <Reveal delay={0.06} className="card p-5 sm:p-6">
               <h2 className="font-display text-sm uppercase tracking-[0.16em] text-fg-subtle">Direct contact</h2>
               <ul className="mt-5 space-y-4">
                 {email ? (
@@ -309,7 +309,7 @@ export default function ContactPage() {
               </div>
             </Reveal>
 
-            <Reveal delay={0.1} className="card p-6">
+            <Reveal delay={0.1} className="card p-5 sm:p-6">
               <h2 className="font-display text-sm uppercase tracking-[0.16em] text-fg-subtle">Availability</h2>
               <p className="mt-3 flex items-center gap-2.5 text-sm font-medium text-fg">
                 <span className="relative flex size-2">

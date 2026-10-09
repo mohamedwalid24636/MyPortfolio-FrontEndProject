@@ -49,8 +49,16 @@ export interface SkillGroup {
 /**
  * Groups skills by their related skill type. Skills without a type are collected
  * into a trailing "Other" group so nothing is silently dropped.
+ *
+ * By default a skill shows up under every type it belongs to. Pass `{ unique: true }`
+ * to list each skill once — under its primary type only — which keeps dense views
+ * (like the resume) compact and free of duplicates.
  */
-export function groupSkillsByType(skills: SkillDto[], types: TypeDto[]): SkillGroup[] {
+export function groupSkillsByType(
+  skills: SkillDto[],
+  types: TypeDto[],
+  options: { unique?: boolean } = {},
+): SkillGroup[] {
   const groups = new Map<string, SkillGroup>();
 
   const ensureGroup = (type: TypeDto | null): SkillGroup => {
@@ -71,6 +79,8 @@ export function groupSkillsByType(skills: SkillDto[], types: TypeDto[]): SkillGr
   skills.forEach((skill) => {
     const primaryType = skill.types?.[0] ?? null;
     ensureGroup(primaryType).skills.push(skill);
+
+    if (options.unique) return;
 
     // A skill can belong to several types; register it in each of the others too.
     (skill.types ?? []).slice(1).forEach((type) => ensureGroup(type).skills.push(skill));

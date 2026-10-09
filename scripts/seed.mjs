@@ -1,372 +1,217 @@
 #!/usr/bin/env node
 /**
- * Seeds the portfolio API with the real CV content.
+ * Imports the whole portfolio from the raw material in ../NeededData through the real admin API.
  *
- * Everything below comes from Mohamed_Walid_Abdullah_CV.pdf — no invented
- * facts. Fields the CV does not state (skill proficiency levels, project
- * dates, credential ids) are intentionally left empty so the UI renders
- * without fabricated data.
+ * The content itself lives in ./portfolio-content.mjs, where every entry names the file it came
+ * from and every inferred value carries an assumption tag (A1..A9). This file is only transport:
+ * it signs in, resolves asset paths, and creates or refreshes each record through the same
+ * endpoints the admin panel uses.
  *
- * Transport note: only Types, Tags, Categories and ContactMessages bind JSON.
- * Every other resource owns an upload, so its controller binds
- * `multipart/form-data` and this script posts FormData for those. Read-only
- * URL fields (`imageUrl`, `fileUrl`, ...) are never sent — the server owns the
- * stored path and hands the URL back on read.
+ * Why the API and not a migration or raw SQL
+ *   - Attachments are the reason. Every image, logo and PDF has to pass through AttachementService,
+ *     which owns the folder, the stored name, the size ceiling and the URL. Writing rows directly
+ *     would leave the database pointing at files that were never stored.
+ *   - The same applies to slugs, reading times, cover paths and the single-active-resume rule: those
+ *     are server-side invariants that only the endpoints enforce.
  *
- * The script is idempotent: it creates only what is missing, so it can be
- * re-run after a partial failure.
+ * Idempotency
+ *   Every resource is keyed by a natural key (name / title / caption / slug / platform), and a row
+ *   that already exists is refreshed with a PUT rather than duplicated. Images are only uploaded
+ *   when the row has nothing stored for that field, so re-running does not litter the attachment
+ *   folder with duplicate GUIDs. Set REUPLOAD_IMAGES=1 to force fresh copies.
  *
- * Auth note: every write endpoint is admin-only, so the script signs in over
- * /auth/login first and sends the returned bearer token on each request. Reads
- * are public and would work without it.
+ * Placeholder cleanup
+ *   `--reset` deletes every existing portfolio record first — files go with the rows — which is the
+ *   only reliable way to clear demo rows from an earlier run. The admin account and the
+ *   contact-message inbox are left alone.
  *
- * Usage:  node scripts/seed.mjs
- * Env:    API_BASE=https://localhost:7067/api
- *         SELF_SIGNED=1        (skip TLS verification for the dev certificate)
- *         ADMIN_EMAIL=...      (defaults to the seeded admin account)
- *         ADMIN_PASSWORD=...
+ * Usage
+ *   npm run verify:content                    # offline: check the content model and its files
+ *   node scripts/seed.mjs                     # create or refresh everything
+ *   node scripts/seed.mjs --reset             # wipe portfolio content first, then import
+ *   node scripts/seed.mjs --dry-run           # print the create/update plan, write nothing
+ *   node scripts/seed.mjs --only=Projects,BlogPosts
+ *
+ * --dry-run still needs the API, because deciding between a create and an update means reading what
+ * is already stored. Use verify:content for the checks that need no server.
+ *
+ * Environment
+ *   API_BASE        defaults to http://localhost:5022/api
+ *   SELF_SIGNED=1   skip TLS verification (only with the https profile)
+ *   ADMIN_EMAIL     must match AdminSeed:Email
+ *   ADMIN_PASSWORD  must match AdminSeed:Password
+ *   NEEDED_DATA_DIR source folder, defaults to ../../NeededData
+ *   REUPLOAD_IMAGES 1 to re-upload images that are already stored
  */
 
 import { readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ACHIEVEMENTS,
+  BLOG_POSTS,
+  CERTIFICATIONS,
+  CATEGORIES,
+  EDUCATIONS,
+  EXPERIENCES,
+  PROFILE,
+  PROJECTS,
+  RESUMES,
+  SERVICES,
+  SKILLS,
+  SOCIAL_LINKS,
+  TAGS,
+  TECHNOLOGIES,
+  TYPES,
+} from "./portfolio-content.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = resolve(HERE, "..", "public");
+const APP_DIR = resolve(HERE, "..");
 
-// Defaults to the same plain-HTTP origin the Vite dev proxy uses, so no TLS bypass is needed. Point
-// it at the https profile only together with SELF_SIGNED=1, because the dev certificate is
-// self-signed and Node's fetch rejects it outright.
 const API_BASE = (process.env.API_BASE || "http://localhost:5022/api").replace(/\/+$/, "");
-
-// These must match the AdminSeed section of the API's appsettings.json.
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123!";
+const NEEDED_DATA_DIR = resolve(
+  process.env.NEEDED_DATA_DIR || join(APP_DIR, "..", "NeededData"),
+);
+const REUPLOAD_IMAGES = process.env.REUPLOAD_IMAGES === "1";
 
-/** Set by signIn() and attached to every subsequent write. */
-let accessToken = null;
+const argv = process.argv.slice(2);
+const RESET = argv.includes("--reset");
+const DRY_RUN = argv.includes("--dry-run");
+const ONLY = (argv.find((argument) => argument.startsWith("--only=")) ?? "").replace("--only=", "");
+const ONLY_SET = ONLY ? new Set(ONLY.split(",").map((value) => value.trim()).filter(Boolean)) : null;
 
 if (process.env.SELF_SIGNED === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-/** Resources whose controller binds `[FromForm]`, i.e. anything that owns an upload. */
+let accessToken = null;
+
+const counts = { created: 0, updated: 0, removed: 0, failed: 0 };
+const problems = [];
+const warnings = [];
+
+/** Controllers that bind [FromForm] — everything else takes a JSON body. */
 const FORM_RESOURCES = new Set([
-  "Profiles",
-  "Projects",
-  "ProjectImages",
-  "Technologies",
-  "Skills",
-  "Services",
-  "Experiences",
-  "Educations",
-  "Certifications",
   "Achievements",
-  "SocialLinks",
-  "Resumes",
   "BlogPosts",
+  "Certifications",
+  "Educations",
+  "Experiences",
+  "ProjectImages",
+  "Projects",
+  "Profiles",
+  "Resumes",
+  "Services",
+  "Skills",
+  "SocialLinks",
+  "Technologies",
 ]);
 
-/* ------------------------------------------------------------------ data */
-
-const TYPES = [
-  { name: "Languages", description: "Programming languages I write in every day" },
-  { name: "Backend", description: "Server-side frameworks and data access" },
-  { name: "Architecture", description: "How I structure maintainable solutions" },
-  { name: "Database", description: "Relational modelling and persistence" },
-  { name: "Tools", description: "Everyday developer tooling" },
+/** Deletion order for --reset: children before parents so no foreign key is left dangling. */
+const RESET_ORDER = [
+  "BlogPosts",
+  "ProjectImages",
+  "Projects",
+  "Achievements",
+  "Certifications",
+  "Resumes",
+  "SocialLinks",
+  "Experiences",
+  "Educations",
+  "Services",
+  "Skills",
+  "Technologies",
+  "Tags",
+  "Categories",
+  "Types",
+  "Profiles",
 ];
 
-const SKILLS = [
-  { name: "C#", types: ["Languages"] },
-  { name: "SQL", types: ["Languages"] },
-  { name: "Python", types: ["Languages"] },
-  { name: "C++", types: ["Languages"] },
-  { name: "ASP.NET Core (Web API / MVC)", types: ["Backend"] },
-  { name: "Entity Framework Core", types: ["Backend", "Database"] },
-  { name: "LINQ", types: ["Backend"] },
-  { name: "RESTful APIs", types: ["Backend", "Architecture"] },
-  { name: "Onion / N-Tier Architecture", types: ["Architecture"] },
-  { name: "Clean Architecture", types: ["Architecture"] },
-  { name: "Repository & Unit of Work", types: ["Architecture"] },
-  { name: "Specification Pattern", types: ["Architecture"] },
-  { name: "Dependency Injection", types: ["Architecture"] },
-  { name: "Pagination", types: ["Architecture"] },
-  { name: "SOLID Principles", types: ["Architecture"] },
-  { name: "Caching", types: ["Backend"] },
-  { name: "SQL Server", types: ["Database"] },
-  { name: "ERD Design", types: ["Database"] },
-  { name: "Schema Design", types: ["Database"] },
-  { name: "Code-First", types: ["Database"] },
-  { name: "Database-First", types: ["Database"] },
-  { name: "Git", types: ["Tools"] },
-  { name: "GitHub", types: ["Tools"] },
-  { name: "Postman", types: ["Tools"] },
-  { name: "Swagger", types: ["Tools"] },
-  { name: "Redis", types: ["Tools"] },
-  { name: "AutoMapper", types: ["Tools"] },
-  { name: "Stripe", types: ["Tools"] },
-];
-
-const CATEGORIES = [
-  { name: "Graduation Project", description: "University final-year work", slug: "graduation-project" },
-  { name: "Web Application", description: "End-to-end web applications", slug: "web-application" },
-  { name: "Backend", description: "API-first and service-oriented work", slug: "backend" },
-];
-
-const TAGS = [
-  { name: "ASP.NET Core", slug: "aspnet-core" },
-  { name: "Clean Architecture", slug: "clean-architecture" },
-  { name: "Entity Framework Core", slug: "entity-framework-core" },
-  { name: "SQL Server", slug: "sql-server" },
-  { name: "Django", slug: "django" },
-  { name: "REST API", slug: "rest-api" },
-];
-
-const TECHNOLOGIES = [
-  { name: ".NET", description: "Microsoft .NET platform", category: "Backend" },
-  { name: "ASP.NET Core", description: "Cross-platform web framework", category: "Backend" },
-  { name: "Entity Framework Core", description: "Object-relational mapper", category: "Database" },
-  { name: "SQL Server", description: "Relational database engine", category: "Database" },
-  { name: "LINQ", description: "Language-integrated query", category: "Backend" },
-  { name: "Django", description: "Python web framework", category: "Backend" },
-  { name: "Python", description: "Programming language", category: "Languages" },
-  { name: "C++", description: "Programming language", category: "Languages" },
-  { name: "AutoMapper", description: "Object-to-object mapping", category: "Tools" },
-  { name: "Redis", description: "Distributed caching", category: "Tools" },
-  { name: "Stripe", description: "Payments integration", category: "Tools" },
-  { name: "Swagger", description: "OpenAPI documentation", category: "Tools" },
-  { name: "Postman", description: "API client and testing", category: "Tools" },
-  { name: "Git", description: "Version control", category: "Tools" },
-];
-
-const PROJECTS = [
-  {
-    title: "Neurea Mental Health Support System",
-    shortDescription:
-      "Graduation project combining ASP.NET Core and Django around structured mental-health support workflows.",
-    description:
-      "Final-year graduation project that merged an ASP.NET Core solution with a Django component over a shared database, so support sessions, assessments and follow-ups are handled through one consistent workflow. Graded A*.",
-    githubUrl:
-      "https://github.com/mohamedwalid24636/Neurea.MentalHealthSupportSystemMergeDataBase-Asp.net-Django-.git",
-    featured: true,
-    status: "Completed",
-    categories: ["Graduation Project", "Web Application"],
-    tags: ["ASP.NET Core", "Django", "SQL Server", "Clean Architecture"],
-    technologies: [".NET", "ASP.NET Core", "Django", "Python", "SQL Server", "Entity Framework Core"],
-  },
-  {
-    title: "Laboratory Management System",
-    shortDescription: "Operations platform for managing laboratory data, workflows and integrity.",
-    description:
-      "A system for running laboratory operations on relational data: modelling the domain in SQL Server, exposing it through ASP.NET Core endpoints and keeping records consistent across the workflows a lab actually performs.",
-    githubUrl: "https://github.com/mohamedwalid24636/LaboratoriesManagementSystem",
-    featured: true,
-    status: "Completed",
-    categories: ["Web Application", "Backend"],
-    tags: ["SQL Server", "Entity Framework Core", "REST API", "Clean Architecture"],
-    technologies: [".NET", "ASP.NET Core", "Entity Framework Core", "SQL Server", "AutoMapper"],
-  },
-  {
-    title: "E-Commerce Backend API",
-    shortDescription: "Clean-architecture RESTful backend for an e-commerce product.",
-    description:
-      "A backend-only e-commerce service built around clean architecture: presentation, application and domain/infrastructure layers stay separated, AutoMapper handles DTO mapping, and Stripe is wired in for payment flows.",
-    githubUrl: "https://github.com/mohamedwalid24636/E-Commerse.Website.git",
-    featured: true,
-    status: "Completed",
-    categories: ["Backend"],
-    tags: ["ASP.NET Core", "REST API", "Clean Architecture", "SQL Server"],
-    technologies: [".NET", "ASP.NET Core", "Entity Framework Core", "SQL Server", "AutoMapper", "Stripe"],
-  },
-];
-
-const SERVICES = [
-  {
-    title: "RESTful API Development",
-    description:
-      "Build and maintain RESTful APIs with ASP.NET Core, with clear contracts, consistent responses and Swagger documentation for every endpoint.",
-    displayOrder: 1,
-    isActive: true,
-  },
-  {
-    title: "Relational Database Design",
-    description:
-      "Model normalised SQL Server schemas, design ERDs, and work fluently with both Code-First and Database-First EF Core workflows.",
-    displayOrder: 2,
-    isActive: true,
-  },
-  {
-    title: "Clean Architecture & Code Structure",
-    description:
-      "Separate concerns with Onion/N-tier or Clean Architecture, applying Repository, Unit of Work, Specification and SOLID principles.",
-    displayOrder: 3,
-    isActive: true,
-  },
-  {
-    title: "Caching & Third-Party Integrations",
-    description:
-      "Speed up data access with Redis caching and integrate external services such as Stripe payments through clean abstractions.",
-    displayOrder: 4,
-    isActive: true,
-  },
-];
-
-const PROFILES = [
-  {
-    fullName: "Mohamed Walid Abdullah",
-    professionalTitle: "Backend .NET Developer",
-    bio: "Computer Science graduate focused on backend development with ASP.NET Core. I design relational databases, build RESTful APIs, and apply modern architecture principles — Clean Architecture, Repository/Unit of Work, and the Specification pattern — to keep software maintainable. Recently completed a 120-hour backend programme at Route Academy and a graduation project graded A*.",
-    location: "Giza, Egypt",
-    email: "Mewalid24636@gmail.com",
-    phone: "+201005041584",
-    yearsOfExperience: 1,
-    // Uploaded as multipart `image`; the server decides the stored path.
-    file: "assets/images/profile.jpg",
-    fileField: "image",
-  },
-];
-
-const SOCIAL_LINKS = [
-  { platform: "GitHub", username: "mohamedwalid24636", url: "https://github.com/mohamedwalid24636" },
-  { platform: "LinkedIn", username: "mohamed-walid", url: "https://www.linkedin.com/in/mohamed-walid-6b12a8314" },
-  { platform: "Email", username: "Mewalid24636@gmail.com", url: "mailto:Mewalid24636@gmail.com" },
-];
-
-const EXPERIENCES = [
-  {
-    jobTitle: "Backend .NET Developer Trainee",
-    companyName: "Route Academy",
-    location: "Giza, Egypt",
-    employmentType: "Full Time",
-    description:
-      "Completed a 120-hour Backend .NET diploma. Built ASP.NET Core MVC and Web API applications, designed relational databases, and applied Clean Architecture principles through hands-on projects.",
-    startDate: "2024-01-01",
-    endDate: "2025-12-31",
-    isCurrent: false,
-  },
-];
-
-const EDUCATIONS = [
-  {
-    institutionName: "Misr University for Science & Technology",
-    degree: "Bachelor of Science",
-    fieldOfStudy: "Computer Science",
-    description:
-      "Graduated with an Excellent standing of CGPA 3.68 / 4.00. Graduation project (Neurea Mental Health Support System) graded A*.",
-    startDate: "2022-09-01",
-    endDate: "2026-07-01",
-    isCurrent: false,
-  },
-];
-
-const CERTIFICATIONS = [
-  {
-    name: "Backend .NET Diploma",
-    issuingOrganization: "Route Academy",
-    issueDate: "2025-12-31",
-    doesNotExpire: true,
-  },
-];
-
-const ACHIEVEMENTS = [
-  {
-    title: "Graduation project graded A*",
-    description:
-      "Awarded an A* for the Neurea Mental Health Support System, which merged an ASP.NET Core solution with a Django component over a shared database.",
-    date: "2026-07-01",
-    url: "https://github.com/mohamedwalid24636/Neurea.MentalHealthSupportSystemMergeDataBase-Asp.net-Django-.git",
-    file: "assets/images/graduation.jpg",
-    fileField: "image",
-  },
-  {
-    title: "CGPA 3.68 / 4.00 — Excellent",
-    description:
-      "Graduated from Misr University for Science & Technology with an Excellent standing in Computer Science.",
-    date: "2026-07-01",
-  },
-  {
-    title: "120-hour Backend .NET programme",
-    description:
-      "Completed the Route Academy backend diploma covering ASP.NET Core, EF Core, relational design and Clean Architecture.",
-    date: "2025-12-31",
-  },
-];
-
-const RESUMES = [
-  {
-    title: "Mohamed Walid Abdullah — Curriculum Vitae",
-    isActive: true,
-    // The server stores the PDF itself; only the active flag and title are plain form fields.
-    file: "assets/cv/Mohamed_Walid_Abdullah_CV.pdf",
-    fileField: "file",
-  },
-];
-
-/* --------------------------------------------------------------- transport */
-
-/** Guesses the MIME type from the extension, since FormData needs one. */
 const MIME_BY_EXTENSION = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".webp": "image/webp",
+  ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".pdf": "application/pdf",
+  ".mp4": "video/mp4",
 };
 
 function mimeFor(path) {
   const extension = path.slice(path.lastIndexOf(".")).toLowerCase();
+
   return MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
 }
 
-async function filePart(relativePath) {
-  const absolute = join(PUBLIC_DIR, relativePath);
-  const bytes = await readFile(absolute);
-  const name = relativePath.slice(relativePath.lastIndexOf("/") + 1);
-  return new File([bytes], name, { type: mimeFor(relativePath) });
+/**
+ * Resolves an asset reference to an absolute path.
+ *   "Talabate LinkedIn Post/HomePage.png"   -> inside NeededData
+ *   "@asset:public/assets/images/x.svg"     -> inside this frontend repo
+ */
+function assetPath(spec) {
+  const prefix = "@asset:";
+
+  if (!spec.startsWith(prefix)) {
+    return join(NEEDED_DATA_DIR, ...spec.split("/").filter(Boolean));
+  }
+
+  return join(APP_DIR, ...spec.slice(prefix.length).split("/").filter(Boolean));
 }
 
-async function buildForm(payload) {
+/* --------------------------------------------------------------- transport */
+
+async function filePart(spec) {
+  const absolute = assetPath(spec);
+  const bytes = await readFile(absolute);
+  const name = absolute.slice(absolute.lastIndexOf(sep) + 1);
+
+  return new File([bytes], name, { type: mimeFor(absolute) });
+}
+
+/**
+ * Builds a multipart body.
+ *
+ * `payload` becomes ordinary form fields; arrays are appended once per item, which is how the
+ * `List<int>` properties (CategoryIds, TagIds, TechnologyIds, TypeIds) bind.
+ *
+ * `files` maps a form field name to `{ spec, skipIfExists }`, where `spec` is a NeededData reference
+ * and `skipIfExists` was decided per attachment. Profile owns two images, and each is checked
+ * against its own response property, so a stored profile photo does not starve the about image.
+ */
+async function buildForm(payload, files = {}) {
   const form = new FormData();
 
   for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined) continue;
+    if (value === undefined || value === null) continue;
 
-    if (key === "file") {
-      // `file` is this script's marker for "upload public/<value> as fileField".
-      continue;
-    }
-
-    if (value === null) {
-      // An explicit null clears a nullable date; FormData has no null, so send nothing
-      // and let the server keep whatever it already has.
-      continue;
-    }
-
+    // A List<int> binds from repeated fields of the same name, which is how CategoryIds,
+    // TagIds, TechnologyIds and TypeIds arrive.
     if (Array.isArray(value)) {
-      // Repeated fields are how ASP.NET binds List<int> from a form.
       for (const item of value) form.append(key, String(item));
       continue;
     }
 
-    if (typeof value === "boolean") form.append(key, value ? "true" : "false");
-    else form.append(key, String(value));
+    form.append(key, String(value));
   }
 
-  if (typeof payload.file === "string") {
-    form.append(payload.fileField ?? "file", await filePart(payload.file));
+  for (const [field, descriptor] of Object.entries(files)) {
+    if (!descriptor?.spec) continue;
+    if (descriptor.skipIfExists && !REUPLOAD_IMAGES) continue;
+
+    form.append(field, await filePart(descriptor.spec));
   }
 
   return form;
 }
 
-/**
- * Exchanges the admin credentials for a bearer token.
- *
- * The API answers 401 with no body for bad credentials, so there is nothing to inspect here — a
- * failure means either the wrong details or an API that has not created the account yet.
- */
+/** Server-derived properties that must never be sent back: they describe stored bytes or the row itself. */
+function requestOnly(payload) {
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+}
+
 async function signIn() {
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
@@ -376,16 +221,15 @@ async function signIn() {
 
   if (!response.ok) {
     throw new Error(
-      `POST /auth/login -> ${response.status}. Check the API is running, that the AddIdentityAuth ` +
-        `migration has been applied, and that ADMIN_EMAIL / ADMIN_PASSWORD match its AdminSeed section.`,
+      `POST /auth/login -> ${response.status}. Check that the API is running, that the ` +
+        "AddIdentityAuth migration has been applied, and that ADMIN_EMAIL / ADMIN_PASSWORD match " +
+        "the AdminSeed section of appsettings.json.",
     );
   }
 
   const body = await response.json();
 
-  if (!body?.token) {
-    throw new Error("POST /auth/login returned no token.");
-  }
+  if (!body?.token) throw new Error("POST /auth/login returned no token.");
 
   accessToken = body.token;
   console.log(`Signed in as ${body.email ?? ADMIN_EMAIL}\n`);
@@ -394,13 +238,9 @@ async function signIn() {
 async function api(path, { method = "GET", form, json } = {}) {
   const init = { method, headers: { Accept: "application/json" } };
 
-  if (accessToken) {
-    init.headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  if (form) {
-    init.body = form;
-  } else if (json !== undefined) {
+  if (accessToken) init.headers.Authorization = `Bearer ${accessToken}`;
+  if (form) init.body = form;
+  else if (json !== undefined) {
     init.headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(json);
   }
@@ -418,31 +258,12 @@ async function api(path, { method = "GET", form, json } = {}) {
   }
 
   if (!response.ok) {
-    const hint =
-      response.status === 401 || response.status === 403
-        ? " The admin token was refused — is it expired?"
-        : "";
+    const hint = response.status === 401 || response.status === 403 ? " Token refused or expired." : "";
 
     throw new Error(`${method} ${path} -> ${response.status} ${JSON.stringify(parsed)}.${hint}`);
   }
 
   return parsed;
-}
-
-async function create(resource, payload) {
-  const isForm = FORM_RESOURCES.has(resource);
-
-  if (isForm) {
-    await api(`/${resource}`, { method: "POST", form: await buildForm(payload) });
-  } else {
-    const { file, fileField, ...rest } = payload;
-    void file;
-    void fileField;
-    await api(`/${resource}`, { method: "POST", json: rest });
-  }
-
-  const label = payload.name ?? payload.title ?? payload.fullName ?? payload.jobTitle ?? payload.institutionName;
-  console.log(`  + ${resource}: ${label}`);
 }
 
 /** pageSize is clamped to 100 server-side, so page through when a set can exceed that. */
@@ -461,95 +282,427 @@ async function listAll(resource) {
   return collected;
 }
 
-/**
- * Creates only the items that are missing and returns a name -> id map, so the
- * script can be re-run safely after a partial failure.
- */
-async function ensureMany(resource, items, key = "name") {
-  const map = new Map((await listAll(resource)).map((row) => [row[key], row.id]));
-  const missing = items.filter((item) => item[key] !== undefined && !map.has(item[key]));
+/** One listing per resource per run, then kept in step by upsert. */
+const cache = new Map();
 
-  for (const item of missing) await create(resource, item);
+async function rows(resource) {
+  if (!cache.has(resource)) cache.set(resource, await listAll(resource));
 
-  for (const row of await listAll(resource)) {
-    if (!map.has(row[key])) map.set(row[key], row.id);
-  }
-
-  return map;
+  return cache.get(resource);
 }
 
-const idsFor = (map, names) => names.map((name) => map.get(name)).filter((id) => typeof id === "number");
+function remember(resource, row) {
+  const cached = cache.get(resource);
+  if (cached) cached.push(row);
+}
 
-/** Singleton resources are only created when the table is empty. */
-async function seedOnce(resource, items, key) {
-  const existing = await listAll(resource);
-  if (existing.length > 0) {
-    console.log(`\n${resource} already has ${existing.length} row(s) — skipping.`);
+/* ------------------------------------------------------------------ upsert */
+
+/**
+ * Creates or refreshes one record.
+ *
+ * `match` receives a row from the API and decides whether it is the same record as the source entry.
+ * `files` maps a DTO file field to `{ spec, urlField }`; when that urlField already holds a value the
+ * upload is skipped unless REUPLOAD_IMAGES=1.
+ */
+async function upsert(resource, label, match, { payload, files = {} }) {
+  const existing = (await rows(resource)).find(match) ?? null;
+  const body = requestOnly(payload);
+
+  // A stored attachment is only re-uploaded when the caller asks for it, so re-running the importer
+  // cannot leave a trail of duplicate GUIDs in the attachment folder.
+  const formFiles = Object.fromEntries(
+    Object.entries(files).map(([field, descriptor]) => [
+      field,
+      { spec: descriptor.spec, skipIfExists: Boolean(existing?.[descriptor.urlField]) },
+    ]),
+  );
+
+  const isForm = FORM_RESOURCES.has(resource);
+
+  if (DRY_RUN) {
+    counts[existing ? "updated" : "created"] += 1;
+    console.log(`  ${existing ? "~" : "+"} ${resource}: ${label} (${existing ? "update" : "create"})`);
+
+    return existing ?? { id: 0 };
+  }
+
+  try {
+    if (!existing) {
+      const created = isForm
+        ? await api(`/${resource}`, { method: "POST", form: await buildForm(body, formFiles) })
+        : await api(`/${resource}`, { method: "POST", json: body });
+
+      remember(resource, created);
+      counts.created += 1;
+      console.log(`  + ${resource}: ${label}`);
+
+      return created;
+    }
+
+    if (isForm) {
+      await api(`/${resource}/${existing.id}`, {
+        method: "PUT",
+        form: await buildForm(body, formFiles),
+      });
+    } else {
+      await api(`/${resource}/${existing.id}`, { method: "PUT", json: body });
+    }
+
+    counts.updated += 1;
+    console.log(`  ~ ${resource}: ${label}`);
+
+    return existing;
+  } catch (error) {
+    counts.failed += 1;
+    problems.push(`${resource} "${label}": ${error.message}`);
+    console.error(`  ! ${resource}: ${label} -> ${error.message}`);
+
+    return existing;
+  }
+}
+
+/**
+ * Builds a matcher for a natural key. Gallery images need a two-field key (project + caption) and
+ * the experience row needs one too, so both forms are expressed as closures.
+ */
+const sameValue = (field, value) => (row) => String(row[field]) === String(value);
+const sameValues = (fields) => (row) => fields.every(([field, value]) => String(row[field]) === String(value));
+
+/* -------------------------------------------------------------------- data */
+
+async function resetContent() {
+  if (DRY_RUN) {
+    console.log("[dry-run] would delete every existing record in this order:");
+    console.log(`  ${RESET_ORDER.join(", ")}\n`);
+
     return;
   }
-  for (const item of items) await create(resource, item);
+
+  console.log("Resetting portfolio content (the admin account and contact inbox are untouched)");
+
+  for (const resource of RESET_ORDER) {
+    const existing = await listAll(resource);
+    let removed = 0;
+
+    for (const row of existing) {
+      try {
+        await api(`/${resource}/${row.id}`, { method: "DELETE" });
+        removed += 1;
+      } catch (error) {
+        problems.push(`DELETE ${resource}/${row.id}: ${error.message}`);
+        console.error(`  ! could not delete ${resource}/${row.id} -> ${error.message}`);
+      }
+    }
+
+    counts.removed += removed;
+    if (removed) console.log(`  - ${resource}: removed ${removed}`);
+    cache.delete(resource);
+  }
+
+  console.log("");
+}
+
+/** Skills, categories, tags, technologies — everything the projects reference by id. */
+async function importReferenceData() {
+  console.log("Skill types");
+  const typeIds = new Map();
+  for (const type of TYPES) {
+    const row = await upsert("Types", type.name, sameValue("name", type.name), { payload: type });
+    if (row) typeIds.set(type.name, row.id);
+  }
+
+  console.log("\nCategories");
+  const categoryIds = new Map();
+  for (const category of CATEGORIES) {
+    const row = await upsert("Categories", category.name, sameValue("name", category.name), {
+      payload: category,
+    });
+    if (row) categoryIds.set(category.name, row.id);
+  }
+
+  console.log("\nTags");
+  const tagIds = new Map();
+  for (const tag of TAGS) {
+    const row = await upsert("Tags", tag.name, sameValue("name", tag.name), { payload: tag });
+    if (row) tagIds.set(tag.name, row.id);
+  }
+
+  console.log("\nTechnologies");
+  const technologyIds = new Map();
+  for (const technology of TECHNOLOGIES) {
+    // No technology icon exists in NeededData; the frontend falls back to a lettered badge.
+    const row = await upsert("Technologies", technology.name, sameValue("name", technology.name), {
+      payload: technology,
+    });
+    if (row) technologyIds.set(technology.name, row.id);
+  }
+
+  const unresolved = [];
+
+  for (const project of PROJECTS) {
+    for (const name of project.categories) if (!categoryIds.has(name)) unresolved.push(`${project.key}: category ${name}`);
+    for (const name of project.tags) if (!tagIds.has(name)) unresolved.push(`${project.key}: tag ${name}`);
+    for (const name of project.technologies) if (!technologyIds.has(name)) unresolved.push(`${project.key}: technology ${name}`);
+  }
+
+  for (const skill of SKILLS) {
+    for (const name of skill.types) if (!typeIds.has(name)) unresolved.push(`skill ${skill.name}: type ${name}`);
+  }
+
+  if (unresolved.length) {
+    warnings.push(`references that did not resolve: ${unresolved.join(", ")}`);
+  }
+
+  return { typeIds, categoryIds, tagIds, technologyIds };
+}
+
+const resolveIds = (map, names) => [...new Set(names.map((name) => map.get(name)))].filter((id) => typeof id === "number");
+
+async function importSkills(typeIds) {
+  console.log("\nSkills");
+  for (const skill of SKILLS) {
+    // proficiencyLevel is deliberately absent: no source file in NeededData states a level, and the
+    // UI renders a progress bar from it, so a number here would be an invented claim.
+    await upsert("Skills", skill.name, sameValue("name", skill.name), {
+      payload: {
+        name: skill.name,
+        description: skill.description,
+        typeIds: resolveIds(typeIds, skill.types),
+      },
+    });
+  }
+}
+
+async function importProjects({ categoryIds, tagIds, technologyIds }) {
+  console.log("\nProjects");
+  const projectIds = new Map();
+
+  for (const project of PROJECTS) {
+    const row = await upsert("Projects", project.title, sameValue("title", project.title), {
+      files: { image: { spec: project.cover, urlField: "imageUrl" } },
+      payload: {
+        title: project.title,
+        description: project.description,
+        shortDescription: project.shortDescription,
+        githubUrl: project.githubUrl,
+        liveDemoUrl: project.liveDemoUrl,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        status: project.status,
+        featured: project.featured,
+        categoryIds: resolveIds(categoryIds, project.categories),
+        tagIds: resolveIds(tagIds, project.tags),
+        technologyIds: resolveIds(technologyIds, project.technologies),
+      },
+    });
+
+    if (row) projectIds.set(project.key, row.id);
+  }
+
+  console.log("\nProject galleries");
+  for (const project of PROJECTS) {
+    const projectId = projectIds.get(project.key);
+    if (!projectId || !project.gallery.length) continue;
+
+    for (const [index, image] of project.gallery.entries()) {
+      const label = `${project.title} / ${image.caption}`;
+
+      // A gallery row is identified by its project plus caption, so re-running refreshes the same
+      // image instead of appending a second copy of every screenshot.
+      await upsert("ProjectImages", label,
+        (row) => row.projectId === projectId && row.caption === image.caption,
+        {
+          files: { image: { spec: image.file, urlField: "imageUrl" } },
+          payload: {
+            caption: image.caption,
+            displayOrder: String(index + 1),
+            projectId,
+          },
+        },
+      );
+    }
+  }
+}
+
+async function importProfile() {
+  console.log("\nProfile");
+  const { image, aboutImage, ...fields } = PROFILE;
+
+  await upsert("Profiles", PROFILE.fullName, sameValue("fullName", PROFILE.fullName), {
+    // Each attachment is checked against its own response property: a stored profile photo must not
+    // stop the about image from being uploaded on the same request.
+    files: {
+      image: { spec: image, urlField: "profileImageUrl" },
+      aboutImage: { spec: aboutImage, urlField: "aboutImageUrl" },
+    },
+    payload: fields,
+  });
+}
+
+async function importSocialLinks() {
+  console.log("\nSocial links");
+  for (const link of SOCIAL_LINKS) {
+    const { icon, ...fields } = link;
+
+    await upsert("SocialLinks", link.platform, sameValue("platform", link.platform), {
+      files: { icon: { spec: icon, urlField: "iconUrl" } },
+      payload: fields,
+    });
+  }
+}
+
+async function importExperienceAndEducation() {
+  console.log("\nExperience");
+  for (const job of EXPERIENCES) {
+    const { logo, ...fields } = job;
+
+    await upsert("Experiences", `${job.jobTitle} — ${job.companyName}`,
+      sameValues([["jobTitle", job.jobTitle], ["companyName", job.companyName]]),
+      {
+        files: { companyLogo: { spec: logo, urlField: "companyLogoUrl" } },
+        payload: fields,
+      },
+    );
+  }
+
+  console.log("\nEducation");
+  for (const school of EDUCATIONS) {
+    const { logo, ...fields } = school;
+
+    await upsert("Educations", school.institutionName,
+      sameValue("institutionName", school.institutionName),
+      {
+        files: { institutionLogo: { spec: logo, urlField: "institutionLogoUrl" } },
+        payload: fields,
+      },
+    );
+  }
+
+  console.log("\nCertifications");
+  for (const certification of CERTIFICATIONS) {
+    await upsert("Certifications", certification.name, sameValue("name", certification.name), {
+      // The DTO has no description property, so the content model keeps the diploma summary for
+      // the blog and the report only; and NeededData has no certificate scan to upload.
+      payload: {
+        name: certification.name,
+        issuingOrganization: certification.issuingOrganization,
+        issueDate: certification.issueDate,
+        doesNotExpire: certification.doesNotExpire,
+      },
+    });
+  }
+}
+
+async function importServices() {
+  console.log("\nServices");
+  for (const service of SERVICES) {
+    await upsert("Services", service.title, sameValue("title", service.title), {
+      // isActive is a non-nullable bool on the DTO, so leaving it out of an update would silently
+      // switch the service off. Every service is part of the offering, so it is always sent.
+      payload: { ...service, isActive: true },
+    });
+  }
+}
+
+async function importAchievements() {
+  console.log("\nAchievements");
+  for (const achievement of ACHIEVEMENTS) {
+    const { image, ...fields } = achievement;
+
+    await upsert("Achievements", achievement.title, sameValue("title", achievement.title), {
+      files: { image: { spec: image, urlField: "imageUrl" } },
+      payload: fields,
+    });
+  }
+}
+
+async function importResume() {
+  console.log("\nResume");
+  for (const resume of RESUMES) {
+    const { file, ...fields } = resume;
+
+    await upsert("Resumes", resume.title, sameValue("title", resume.title), {
+      // The PDF is uploaded from NeededData, not from public/assets, so the backend copy is the one
+      // the CV was taken from.
+      files: { file: { spec: file, urlField: "fileUrl" } },
+      payload: fields,
+    });
+  }
+}
+
+async function importBlogPosts() {
+  console.log("\nBlog posts");
+  for (const post of BLOG_POSTS) {
+    // cover is uploaded, key is a local handle rather than a DTO property; both are dropped.
+    const { cover, key, ...fields } = post;
+
+    void key;
+
+    await upsert("BlogPosts", fields.title, sameValue("title", fields.title), {
+      // Slug, reading time and publishedAt are derived server-side and must not be sent.
+      files: { coverImage: { spec: cover, urlField: "coverImageUrl" } },
+      payload: fields,
+    });
+  }
 }
 
 /* -------------------------------------------------------------------- run */
 
-async function seed() {
-  console.log(`Seeding ${API_BASE} with real CV data...\n`);
+function report() {
+  console.log("\n----------------------------------------");
+  if (counts.removed) console.log(`removed: ${counts.removed}`);
+  console.log(`created: ${counts.created}`);
+  console.log(`updated: ${counts.updated}`);
+  console.log(`failed:  ${counts.failed}`);
 
-  // Every create below needs a token, so there is nothing to do until this succeeds.
-  await signIn();
+  if (DRY_RUN) {
+    console.log("(dry run — no record was created, updated or deleted)");
+  }
 
-  console.log("Reference data");
-  const typeIds = await ensureMany("Types", TYPES);
-  const categoryIds = await ensureMany("Categories", CATEGORIES);
-  const tagIds = await ensureMany("Tags", TAGS);
-  const technologyIds = await ensureMany("Technologies", TECHNOLOGIES);
+  for (const warning of warnings) console.log(`\nWarning: ${warning}`);
 
-  console.log("\nSkills");
-  await ensureMany(
-    "Skills",
-    SKILLS.map((skill) => ({
-      name: skill.name,
-      description: null,
-      // The CV lists skills without proficiency ratings, so no level is claimed.
-      proficiencyLevel: null,
-      typeIds: idsFor(typeIds, skill.types),
-    })),
-  );
-
-  console.log("\nProjects");
-  await ensureMany(
-    "Projects",
-    PROJECTS.map((project) => ({
-      title: project.title,
-      description: project.description,
-      shortDescription: project.shortDescription,
-      githubUrl: project.githubUrl,
-      liveDemoUrl: null,
-      startDate: null,
-      endDate: null,
-      status: project.status,
-      featured: project.featured,
-      categoryIds: idsFor(categoryIds, project.categories),
-      tagIds: idsFor(tagIds, project.tags),
-      technologyIds: idsFor(technologyIds, project.technologies),
-    })),
-    "title",
-  );
-
-  console.log("\nProfile and content");
-  await seedOnce("Profiles", PROFILES, "fullName");
-  await seedOnce("SocialLinks", SOCIAL_LINKS, "platform");
-  await seedOnce("Services", SERVICES, "title");
-  await seedOnce("Experiences", EXPERIENCES, "jobTitle");
-  await seedOnce("Educations", EDUCATIONS, "institutionName");
-  await seedOnce("Certifications", CERTIFICATIONS, "name");
-  await seedOnce("Achievements", ACHIEVEMENTS, "title");
-  await seedOnce("Resumes", RESUMES, "title");
-
-  console.log("\nDone. Portfolio content is now served by the API.");
+  if (problems.length) {
+    console.log("\nProblems:");
+    for (const problem of problems) console.log(`  - ${problem}`);
+  }
 }
 
-seed().catch((error) => {
-  console.error("\nSeed failed:", error.message);
+async function main() {
+  console.log(`Importing portfolio content from ${NEEDED_DATA_DIR}`);
+  console.log(`API: ${API_BASE}${DRY_RUN ? "   (dry run — nothing will be written)" : ""}\n`);
+
+  await signIn();
+
+  if (RESET) await resetContent();
+
+  const wants = (resource) => !ONLY_SET || ONLY_SET.has(resource);
+
+  const reference = await importReferenceData();
+
+  if (wants("Skills")) await importSkills(reference.typeIds);
+  if (wants("Projects")) await importProjects(reference);
+  if (wants("Profiles")) await importProfile();
+  if (wants("SocialLinks")) await importSocialLinks();
+  if (wants("Experiences")) await importExperienceAndEducation();
+  if (wants("Services")) await importServices();
+  if (wants("Achievements")) await importAchievements();
+  if (wants("Resumes")) await importResume();
+  if (wants("BlogPosts")) await importBlogPosts();
+
+  report();
+
+  if (counts.failed > 0) {
+    process.exitCode = 1;
+  } else if (DRY_RUN) {
+    console.log(`\nDry run only: ${counts.created} to create, ${counts.updated} to refresh. Nothing was written.`);
+  } else {
+    console.log("\nDone. The API is now serving the imported content.");
+  }
+}
+
+main().catch((error) => {
+  report();
+  console.error("\nImport failed:", error.message);
   process.exit(1);
 });

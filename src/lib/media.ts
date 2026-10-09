@@ -72,12 +72,6 @@ export function resolveImageUrl(url: string | null | undefined): string {
   return `${APP_BASE}/${value}`;
 }
 
-/** Resolves a downloadable document, falling back to a bundled copy when absent. */
-export function resolveFileUrl(url: string | null | undefined, fallback: string): string {
-  if (typeof url !== "string" || url.trim().length === 0) return fallback;
-  return resolveImageUrl(url);
-}
-
 /** True when the backend provided a usable link we can render as an anchor. */
 export function hasLink(url: string | null | undefined): url is string {
   return typeof url === "string" && url.trim().length > 0;

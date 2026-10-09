@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" role="img" aria-label="Sunny Land 2D Platformer">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0d1a"/>
+      <stop offset="0.55" stop-color="#151b36"/>
+      <stop offset="1" stop-color="#1d2551"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#ffffff" stroke-opacity="0.05"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect width="1200" height="675" fill="url(#grid)"/>
+  <circle cx="990" cy="110" r="270" fill="#6366f1" opacity="0.18"/>
+  <circle cx="170" cy="610" r="230" fill="#22d3ee" opacity="0.12"/>
+  <rect x="80" y="86" width="128" height="128" rx="30" fill="url(#accent)" opacity="0.16"/>
+  <rect x="80" y="86" width="128" height="128" rx="30" fill="none" stroke="url(#accent)" stroke-width="2" stroke-opacity="0.55"/>
+  <text x="144" y="176" text-anchor="middle" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="76" font-weight="700" fill="url(#accent)">S</text>
+  <text x="244" y="140" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="30" font-weight="600" fill="#eef1f8" opacity="0.75">Published Game</text>
+  <text x="244" y="190" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="52" font-weight="700" fill="#eef1f8">Sunny Land</text>
+  <text x="80" y="330" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="46" font-weight="700" fill="#eef1f8">2D Platformer</text>
+  <text x="80" y="388" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="46" font-weight="700" fill="#eef1f8">Built with Unity</text>
+  <text x="80" y="440" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="26" fill="#a5adc8">Collect gems, defeat enemies and reach</text>
+  <text x="80" y="478" font-family="ui-sans-serif, system-ui, 'Segoe UI', sans-serif" font-size="26" fill="#a5adc8">the final house to win the game</text>
+  <g font-family="ui-monospace, 'Cascadia Code', monospace" font-size="22" fill="#c7d2fe">
+    <rect x="80" y="530" width="132" height="52" rx="26" fill="#6366f1" opacity="0.14" stroke="#6366f1" stroke-opacity="0.45"/>
+    <text x="146" y="563" text-anchor="middle">Unity</text>
+    <rect x="228" y="530" width="112" height="52" rx="26" fill="#22d3ee" opacity="0.12" stroke="#22d3ee" stroke-opacity="0.4"/>
+    <text x="284" y="563" text-anchor="middle">C#</text>
+    <rect x="356" y="530" width="212" height="52" rx="26" fill="#6366f1" opacity="0.14" stroke="#6366f1" stroke-opacity="0.45"/>
+    <text x="462" y="563" text-anchor="middle">2D Tilemaps</text>
+  </g>
+</svg>

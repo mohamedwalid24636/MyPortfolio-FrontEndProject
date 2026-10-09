@@ -10,7 +10,9 @@ import {
   MapPin,
   Printer,
 } from "lucide-react";
-import { ProjectGrid } from "@/components/project/ProjectCard";
+import { ProjectCarousel } from "@/components/project/ProjectCarousel";
+import { SkillsAccordion } from "@/components/resume/SkillsAccordion";
+import { CardRail } from "@/components/ui/CardRail";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -23,7 +25,14 @@ import { useSiteData } from "@/context/SiteDataContext";
 import { useAllProjects } from "@/hooks/usePortfolioData";
 import { formatDateRange, formatFullDate, toBulletList } from "@/lib/format";
 import { hasLink, resolveImageUrl } from "@/lib/media";
-import { groupSkillsByType, parseProficiency } from "@/lib/skills";
+import { getExperiences } from "@/lib/experiences";
+import { groupSkillsByType } from "@/lib/skills";
+import type {
+  AchievementDto,
+  CertificationDto,
+  EducationDto,
+  ExperienceDto,
+} from "@/types/api";
 
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -44,15 +53,164 @@ function Block({
   children: React.ReactNode;
 }) {
   return (
-    <Reveal className="border-t border-white/8 pt-8">
+    <Reveal className="border-t border-white/8 pt-7 sm:pt-8">
       <h2 className="flex items-center gap-2.5 font-display text-xl font-bold">
         <span className="flex size-9 items-center justify-center rounded-xl border border-accent-500/25 bg-accent-500/10 text-accent-200">
           <Icon aria-hidden="true" className="size-4.5" />
         </span>
         {title}
       </h2>
-      <div className="mt-5">{children}</div>
+      <div className="mt-4 sm:mt-5">{children}</div>
     </Reveal>
+  );
+}
+
+/** Bullets shared by the experience card. */
+function Bullets({ bullets }: { bullets: string[] }) {
+  if (bullets.length === 0) return null;
+  return (
+    <ul className="mt-3.5 space-y-1.5">
+      {bullets.map((bullet, index) => (
+        <li key={index} className="flex gap-2.5 text-sm leading-relaxed text-fg-muted">
+          <span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-accent-500/70" />
+          <span>{bullet}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ExperienceCard({ experience }: { experience: ExperienceDto }) {
+  const bullets = toBulletList(experience.description);
+  const meta = [experience.employmentType, experience.location].filter(Boolean).join(" · ");
+
+  return (
+    <article className="card h-full p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="font-display text-base font-semibold break-words text-fg">
+            {experience.jobTitle}
+          </h3>
+          <p className="mt-0.5 text-sm break-words text-accent-300">{experience.companyName}</p>
+        </div>
+        <span className="chip shrink-0">
+          {formatDateRange(experience.startDate, experience.endDate, experience.isCurrent)}
+        </span>
+      </div>
+
+      {meta ? <p className="mt-1.5 text-xs text-fg-subtle">{meta}</p> : null}
+
+      <Bullets bullets={bullets} />
+    </article>
+  );
+}
+
+function EducationCard({ education }: { education: EducationDto }) {
+  return (
+    <article className="card h-full p-5">
+      <h3 className="font-display text-base font-semibold break-words text-fg">{education.degree}</h3>
+      <p className="mt-0.5 text-sm break-words text-accent-300">{education.institutionName}</p>
+      <p className="mt-1 text-xs text-fg-subtle">
+        {formatDateRange(education.startDate, education.endDate, education.isCurrent)}
+        {education.fieldOfStudy ? ` · ${education.fieldOfStudy}` : ""}
+      </p>
+      {education.description ? (
+        <p className="mt-3 text-sm leading-relaxed text-fg-muted">{education.description}</p>
+      ) : null}
+    </article>
+  );
+}
+
+function CertificationCard({ certification }: { certification: CertificationDto }) {
+  const issued = formatFullDate(certification.issueDate);
+  const certificateHref = hasLink(certification.credentialUrl)
+    ? certification.credentialUrl
+    : hasLink(certification.certificateUrl)
+      ? resolveImageUrl(certification.certificateUrl)
+      : null;
+  const certificateLabel = hasLink(certification.credentialUrl) ? "Verify credential" : "View certificate";
+
+  const content = (
+    <>
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-accent-500/25 bg-accent-500/10 text-accent-200">
+          <Award aria-hidden="true" className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="font-display text-base font-semibold break-words text-fg">{certification.name}</h3>
+          <p className="mt-0.5 text-sm break-words text-accent-300">{certification.issuingOrganization}</p>
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs text-fg-subtle">
+        {issued ? `Issued ${issued}` : "Issue date unavailable"}
+        {certification.doesNotExpire ? " · No expiry" : ""}
+      </p>
+
+      {certificateHref ? (
+        <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-accent-300">
+          {certificateLabel}
+          <ExternalLink aria-hidden="true" className="size-3.5" />
+        </span>
+      ) : null}
+    </>
+  );
+
+  return (
+    <article className="card card-hover group h-full p-5">
+      {certificateHref ? (
+        <a
+          href={certificateHref}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="block h-full focus-visible:outline-none"
+        >
+          {content}
+        </a>
+      ) : (
+        content
+      )}
+    </article>
+  );
+}
+
+function AchievementCard({ achievement }: { achievement: AchievementDto }) {
+  return (
+    <article className="card h-full p-5">
+      {hasLink(achievement.imageUrl) ? (
+        <SmartImage
+          src={achievement.imageUrl}
+          alt={achievement.title}
+          className="mb-3 aspect-[16/9] w-full rounded-xl object-cover"
+        />
+      ) : null}
+
+      <h3 className="font-display text-base font-semibold break-words text-fg">{achievement.title}</h3>
+      {achievement.description ? (
+        <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{achievement.description}</p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        {achievement.date ? (
+          <span className="text-xs text-fg-subtle">{formatFullDate(achievement.date)}</span>
+        ) : (
+          <span aria-hidden="true" />
+        )}
+        {hasLink(achievement.url) ? (
+          <a
+            href={achievement.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="btn-outline !px-3.5 !py-2 text-xs"
+          >
+            View
+            <ExternalLink aria-hidden="true" className="size-3.5" />
+          </a>
+        ) : (
+          <Chip>Verified</Chip>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -84,7 +242,8 @@ export default function ResumePage() {
   const name = profile?.fullName ?? "";
   const title = profile?.professionalTitle ?? "";
 
-  const skillGroups = groupSkillsByType(data.skills, data.types);
+  const skillGroups = groupSkillsByType(data.skills, data.types, { unique: true });
+  const experiences = getExperiences(data.experiences);
 
   return (
     <>
@@ -143,12 +302,26 @@ export default function ResumePage() {
         </Reveal>
       ) : null}
 
-      <section className="section pt-14">
-        <div className="container-page grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
+      <section className="section pt-10 sm:pt-14">
+        <div className="container-page grid gap-8 sm:gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
           {/* Sidebar */}
-          <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          <aside className="space-y-5 sm:space-y-6 lg:sticky lg:top-24 lg:self-start">
             <Reveal className="card overflow-hidden">
-              <div className="relative">
+              {/* Compact identity header for small screens — a full cover would dominate the viewport. */}
+              <div className="flex items-center gap-4 p-4 sm:hidden">
+                <SmartImage
+                  src={profile?.profileImageUrl}
+                  alt={name}
+                  eager
+                  className="size-16 shrink-0 rounded-2xl object-cover"
+                />
+                <div className="min-w-0">
+                  <p className="font-display text-lg font-bold text-fg">{name}</p>
+                  {title ? <p className="text-sm text-accent-300">{title}</p> : null}
+                </div>
+              </div>
+
+              <div className="relative hidden sm:block">
                 <SmartImage
                   src={profile?.profileImageUrl}
                   alt={name}
@@ -157,7 +330,7 @@ export default function ResumePage() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/30 to-transparent" />
                 <div className="absolute inset-x-5 bottom-4">
-                  <h1 className="font-display text-xl font-bold text-fg">{name}</h1>
+                  <p className="font-display text-xl font-bold text-fg">{name}</p>
                   {title ? <p className="text-sm text-accent-300">{title}</p> : null}
                 </div>
               </div>
@@ -188,61 +361,64 @@ export default function ResumePage() {
               </dl>
             </Reveal>
 
-            <Reveal delay={0.06} className="card p-6">
+            <Reveal delay={0.06} className="card p-5 sm:p-6">
               <h2 className="font-display text-sm uppercase tracking-[0.16em] text-fg-subtle">Skills</h2>
 
-              <div className="mt-4 space-y-5">
+              <div className="mt-4">
                 <DataSection
                   items={data.skills}
                   isLoading={isLoading}
                   error={error}
                   onRetry={reload}
                   skeleton={
-                    <div className="space-y-2" aria-busy="true">
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-4" aria-busy="true">
                       {Array.from({ length: 6 }, (_, index) => (
-                        <Skeleton key={index} className="h-4 w-full" />
+                        <div key={index} className="space-y-2">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-3 w-full" />
+                          <Skeleton className="h-3 w-4/5" />
+                        </div>
                       ))}
                     </div>
                   }
                   empty={<p className="text-sm text-fg-muted">No skills recorded yet.</p>}
                 >
-                  {() =>
-                    skillGroups.map((group) => (
-                      <div key={group.key}>
-                        <p className="mb-2 font-mono text-[0.7rem] uppercase tracking-[0.18em] text-accent-300">
-                          {group.title}
-                        </p>
-                        <ul className="space-y-1.5">
-                          {group.skills.map((skill) => {
-                            const percentage = parseProficiency(skill.proficiencyLevel);
-                            return (
-                              <li key={`${group.key}-${skill.id}`} className="flex items-center justify-between gap-3 text-sm">
-                                <span className="text-fg-muted">{skill.name}</span>
-                                <span className="flex shrink-0 items-center gap-2">
-                                  {percentage !== null ? (
-                                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-white/10">
-                                      <span
-                                        className="block h-full rounded-full bg-gradient-to-r from-accent-500 to-cyan-400"
-                                        style={{ width: `${percentage}%` }}
-                                      />
-                                    </span>
-                                  ) : null}
-                                  {skill.proficiencyLevel ? (
-                                    <span className="text-xs text-fg-subtle">{skill.proficiencyLevel}</span>
-                                  ) : null}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                  {() => (
+                    <>
+                      <div className="hidden gap-x-5 gap-y-4 lg:grid lg:grid-cols-2">
+                        {skillGroups.map((group) => (
+                          <div key={group.key}>
+                            <p className="mb-1.5 font-mono text-[0.7rem] uppercase tracking-[0.18em] text-accent-300">
+                              {group.title}
+                            </p>
+                            <ul className="space-y-1">
+                              {group.skills.map((skill) => (
+                                <li
+                                  key={`${group.key}-${skill.id}`}
+                                  className="flex items-baseline gap-2 text-sm leading-snug text-fg-muted"
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className="size-1 shrink-0 translate-y-[-2px] rounded-full bg-accent-500/70"
+                                  />
+                                  <span className="min-w-0">{skill.name}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
                       </div>
-                    ))
-                  }
+
+                      <div className="lg:hidden">
+                        <SkillsAccordion groups={skillGroups} />
+                      </div>
+                    </>
+                  )}
                 </DataSection>
               </div>
             </Reveal>
 
-            <Reveal delay={0.1} className="card p-6">
+            <Reveal delay={0.1} className="card p-5 sm:p-6">
               <h2 className="font-display text-sm uppercase tracking-[0.16em] text-fg-subtle">References</h2>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">
                 Available on request.
@@ -257,8 +433,8 @@ export default function ResumePage() {
           </aside>
 
           {/* Main column */}
-          <div className="space-y-10">
-            <Reveal className="card p-6 sm:p-7">
+          <div className="min-w-0 space-y-8 sm:space-y-10">
+            <Reveal className="card p-5 sm:p-7">
               <h2 className="font-display text-xl font-bold">Professional summary</h2>
               {profile?.bio ? (
                 <p className="mt-4 text-base leading-relaxed text-fg-muted">{profile.bio}</p>
@@ -267,16 +443,11 @@ export default function ResumePage() {
 
             <Block icon={Briefcase} title="Experience">
               <DataSection
-                items={data.experiences}
+                items={experiences}
                 isLoading={isLoading}
                 error={error}
                 onRetry={reload}
-                skeleton={
-                  <div className="space-y-4" aria-busy="true">
-                    <Skeleton className="h-24 w-full rounded-2xl" />
-                    <Skeleton className="h-24 w-full rounded-2xl" />
-                  </div>
-                }
+                skeleton={<Skeleton className="h-40 w-full rounded-2xl" />}
                 empty={
                   <EmptyState
                     icon={Briefcase}
@@ -287,35 +458,13 @@ export default function ResumePage() {
                 }
               >
                 {(items) => (
-                  <div className="space-y-5">
-                    {items.map((experience) => {
-                      const bullets = toBulletList(experience.description);
-                      return (
-                        <article key={experience.id} className="card p-5">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-display text-base font-semibold text-fg">{experience.jobTitle}</h3>
-                              <p className="mt-0.5 text-sm text-accent-300">{experience.companyName}</p>
-                            </div>
-                            <span className="chip">
-                              {formatDateRange(experience.startDate, experience.endDate, experience.isCurrent)}
-                            </span>
-                          </div>
-
-                          {bullets.length > 0 ? (
-                            <ul className="mt-3.5 space-y-1.5">
-                              {bullets.map((bullet, index) => (
-                                <li key={index} className="flex gap-2.5 text-sm leading-relaxed text-fg-muted">
-                                  <span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-accent-500/70" />
-                                  <span>{bullet}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </article>
-                      );
-                    })}
-                  </div>
+                  <CardRail
+                    items={items}
+                    getKey={(experience) => experience.id}
+                    label="experience"
+                    slideClassName="w-[85%] sm:w-80"
+                    renderItem={(experience) => <ExperienceCard experience={experience} />}
+                  />
                 )}
               </DataSection>
             </Block>
@@ -336,7 +485,7 @@ export default function ResumePage() {
                   />
                 }
               >
-                {(items) => <ProjectGrid projects={items} />}
+                {(items) => <ProjectCarousel projects={items} />}
               </DataSection>
             </Block>
 
@@ -346,7 +495,7 @@ export default function ResumePage() {
                 isLoading={isLoading}
                 error={error}
                 onRetry={reload}
-                skeleton={<Skeleton className="h-24 w-full rounded-2xl" />}
+                skeleton={<Skeleton className="h-32 w-full rounded-2xl" />}
                 empty={
                   <EmptyState
                     icon={GraduationCap}
@@ -356,21 +505,13 @@ export default function ResumePage() {
                 }
               >
                 {(items) => (
-                  <div className="space-y-5">
-                    {items.map((education) => (
-                      <article key={education.id} className="card p-5">
-                        <h3 className="font-display text-base font-semibold text-fg">{education.degree}</h3>
-                        <p className="mt-0.5 text-sm text-accent-300">{education.institutionName}</p>
-                        <p className="mt-1 text-xs text-fg-subtle">
-                          {formatDateRange(education.startDate, education.endDate, education.isCurrent)}
-                          {education.fieldOfStudy ? ` · ${education.fieldOfStudy}` : ""}
-                        </p>
-                        {education.description ? (
-                          <p className="mt-3 text-sm leading-relaxed text-fg-muted">{education.description}</p>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
+                  <CardRail
+                    items={items}
+                    getKey={(education) => education.id}
+                    label="education"
+                    slideClassName="w-[85%] sm:w-80"
+                    renderItem={(education) => <EducationCard education={education} />}
+                  />
                 )}
               </DataSection>
             </Block>
@@ -381,7 +522,7 @@ export default function ResumePage() {
                 isLoading={isLoading}
                 error={error}
                 onRetry={reload}
-                skeleton={<Skeleton className="h-20 w-full rounded-2xl" />}
+                skeleton={<Skeleton className="h-32 w-full rounded-2xl" />}
                 empty={
                   <EmptyState
                     icon={Award}
@@ -392,50 +533,13 @@ export default function ResumePage() {
                 }
               >
                 {(items) => (
-                  <ul className="space-y-4">
-                    {items.map((certification) => {
-                      const issued = formatFullDate(certification.issueDate);
-                      const certificateHref = hasLink(certification.credentialUrl)
-                        ? certification.credentialUrl
-                        : hasLink(certification.certificateUrl)
-                          ? resolveImageUrl(certification.certificateUrl)
-                          : null;
-                      const certificateLabel = hasLink(certification.credentialUrl)
-                        ? "Verify credential"
-                        : "View certificate";
-                      const content = (
-                        <>
-                          <h3 className="font-display text-base font-semibold text-fg">{certification.name}</h3>
-                          <p className="mt-0.5 text-sm text-accent-300">{certification.issuingOrganization}</p>
-                          <p className="mt-1 text-xs text-fg-subtle">
-                            {issued ? `Issued ${issued}` : "Issue date unavailable"}
-                            {certification.doesNotExpire ? " · No expiry" : ""}
-                          </p>
-                        </>
-                      );
-
-                      return (
-                        <li key={certification.id} className="card p-5">
-                          {certificateHref ? (
-                            <a
-                              href={certificateHref}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              className="group block"
-                            >
-                              {content}
-                              <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-accent-300">
-                                {certificateLabel}
-                                <ExternalLink aria-hidden="true" className="size-3.5" />
-                              </span>
-                            </a>
-                          ) : (
-                            content
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <CardRail
+                    items={items}
+                    getKey={(certification) => certification.id}
+                    label="certifications"
+                    slideClassName="w-[85%] sm:w-80"
+                    renderItem={(certification) => <CertificationCard certification={certification} />}
+                  />
                 )}
               </DataSection>
             </Block>
@@ -446,45 +550,17 @@ export default function ResumePage() {
                 isLoading={isLoading}
                 error={error}
                 onRetry={reload}
-                skeleton={<Skeleton className="h-20 w-full rounded-2xl" />}
+                skeleton={<Skeleton className="h-32 w-full rounded-2xl" />}
                 empty={<EmptyState icon={Award} title="No achievements listed yet" compact />}
               >
                 {(items) => (
-                  <ul className="space-y-4">
-                    {items.map((achievement) => (
-                      <li key={achievement.id} className="card flex flex-wrap items-start justify-between gap-3 p-5">
-                        {hasLink(achievement.imageUrl) ? (
-                          <SmartImage
-                            src={achievement.imageUrl}
-                            alt={achievement.title}
-                            className="size-20 shrink-0 rounded-xl object-cover"
-                          />
-                        ) : null}
-                        <div className="min-w-0">
-                          <h3 className="font-display text-base font-semibold text-fg">{achievement.title}</h3>
-                          {achievement.description ? (
-                            <p className="mt-1 text-sm leading-relaxed text-fg-muted">{achievement.description}</p>
-                          ) : null}
-                          {achievement.date ? (
-                            <p className="mt-1.5 text-xs text-fg-subtle">{formatFullDate(achievement.date)}</p>
-                          ) : null}
-                        </div>
-                        {hasLink(achievement.url) ? (
-                          <a
-                            href={achievement.url}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="btn-outline !px-3.5 !py-2 text-xs"
-                          >
-                            View
-                            <ExternalLink aria-hidden="true" className="size-3.5" />
-                          </a>
-                        ) : (
-                          <Chip>Verified</Chip>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <CardRail
+                    items={items}
+                    getKey={(achievement) => achievement.id}
+                    label="achievements"
+                    slideClassName="w-[85%] sm:w-80"
+                    renderItem={(achievement) => <AchievementCard achievement={achievement} />}
+                  />
                 )}
               </DataSection>
             </Block>
